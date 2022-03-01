@@ -1,0 +1,6 @@
+/venv
+/env
+
+.idea
+/notebooks/.ipynb_checkpoints
+/data
