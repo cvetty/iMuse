@@ -1,11 +1,10 @@
 import tensorflow as tf
-
-from tensorflow.keras.layers import Layer
+from tensorflow.keras.layers import Layer, ReLU, Conv2D
 from utils import _conv2d, _conv2d_transpose
 
 class WaveletPooling(Layer):
     """
-    Implemetation of Wavelet Pooing
+    Wavelet Pooing Custom Layer
     """
     def __init__(self, name=''):
         super(WaveletPooling, self).__init__()
@@ -52,7 +51,7 @@ class WaveletPooling(Layer):
 
 class WaveletUnpooling(Layer):
     """
-    Implementation of WaveLet Unpooling
+    Wavelet Unpooing Custom Layer
     """
     def __init__(self, name):
         super(WaveletUnpooling, self).__init__()
@@ -121,7 +120,6 @@ class ReflectionPadding2D(Layer):
         return config
 
 class CNNBlock(Layer):
-    
     def __init__(self, filters, kernel, name):
         super(CNNBlock, self).__init__()
         self._name = name

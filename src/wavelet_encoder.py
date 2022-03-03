@@ -4,7 +4,6 @@ from tensorflow.keras.layers import Conv2D
 from core import CNNBlock, WaveletPooling
 
 class WaveletEncoder(Model):
-    
     def __init__(self):
         super().__init__()
         self._name = 'WaveletEncoder'

@@ -3,7 +3,6 @@ from tensorflow.keras.layers import Conv2D
 from core import CNNBlock, WaveletUnpooling, ReflectionPadding2D
 
 class WaveletDecoder(Model):
-    
     def __init__(self):
         super().__init__()
         self._name = 'WaveletDecoder'
