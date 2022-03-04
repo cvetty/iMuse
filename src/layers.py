@@ -2,10 +2,12 @@ import tensorflow as tf
 from tensorflow.keras.layers import Layer, ReLU, Conv2D
 from utils import _conv2d, _conv2d_transpose
 
+
 class WaveletPooling(Layer):
     """
     Wavelet Pooing Custom Layer
     """
+
     def __init__(self, name=''):
         super(WaveletPooling, self).__init__()
         self._name = name
@@ -53,6 +55,7 @@ class WaveletUnpooling(Layer):
     """
     Wavelet Unpooing Custom Layer
     """
+
     def __init__(self, name):
         super(WaveletUnpooling, self).__init__()
         self._name = name
@@ -76,7 +79,9 @@ class WaveletUnpooling(Layer):
         LL, LH, HL, HH = self.repeat_filters(LL_in.shape[-1])
         out_shape = tf.shape(tensor_in)
 
-        return _conv2d_transpose(LL_in, LL, output_shape=out_shape) + _conv2d_transpose(LH_in, LH, output_shape=out_shape) + _conv2d_transpose(HL_in, HL, output_shape=out_shape) + _conv2d_transpose(HH_in, HH, output_shape=out_shape)
+        return _conv2d_transpose(LL_in, LL, output_shape=out_shape) + _conv2d_transpose(LH_in, LH,
+                                                                                        output_shape=out_shape) + _conv2d_transpose(
+            HL_in, HL, output_shape=out_shape) + _conv2d_transpose(HH_in, HH, output_shape=out_shape)
 
     def compute_output_shape(self, input_shape):
         _ip_shape = input_shape[0]
@@ -119,18 +124,19 @@ class ReflectionPadding2D(Layer):
         print(config)
         return config
 
+
 class CNNBlock(Layer):
     def __init__(self, filters, kernel, name):
         super(CNNBlock, self).__init__()
         self._name = name
-        
+
         self.padding = ReflectionPadding2D()
-        self.conv2d = Conv2D(filters, kernel, padding = 'valid')
+        self.conv2d = Conv2D(filters, kernel, padding='valid')
         self.activation = ReLU()
 
     def call(self, inputs):
         x = self.padding(inputs)
         x = self.conv2d(x)
         x = self.activation(x)
-        
+
         return x
