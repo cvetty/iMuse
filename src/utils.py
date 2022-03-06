@@ -3,15 +3,18 @@ from tensorflow.nn import conv2d, conv2d_transpose
 from tensorflow.io import read_file
 from tensorflow.image import decode_image
 
+
 def _conv2d(x, kernel):
     return conv2d(x, kernel, strides=[1, 2, 2, 1], padding='SAME')
 
+
 def _conv2d_transpose(x, kernel, output_shape):
     return conv2d_transpose(
-            x, kernel,
-            output_shape=output_shape,
-            strides=[1, 2, 2, 1],
-            padding='SAME')
+        x, kernel,
+        output_shape=output_shape,
+        strides=[1, 2, 2, 1],
+        padding='SAME')
+
 
 def load_image(image_path):
     image = read_file(image_path)
@@ -37,6 +40,7 @@ def preprocess_feat(feat, center=False):
 def center_feat(feat):
     feat_mean = tf.math.reduce_mean(feat, 1)
     feat_mean = tf.expand_dims(feat_mean, 1)
+
     return tf.subtract(feat, feat_mean)
 
 
@@ -55,6 +59,7 @@ def get_style_correlation_transform(feat, return_mean=False):
     s_e = tf.pow(s_e, 0.5)
 
     EDE = tf.matmul(tf.matmul(s_v, tf.linalg.diag(s_e)), s_v, transpose_b=True)
+
     return (EDE, mean) if return_mean else EDE
 
 
@@ -78,4 +83,17 @@ def wct(content_feat_raw, style_feat_raw, alpha=1):
 
     final_out = tf.reshape(tf.transpose(final_out), content_feat_raw.shape)
     final_out = alpha * final_out + (1 - alpha) * content_feat_raw
+
     return final_out
+
+
+def sample_from_corr_matrix(sigma, num_features=None, eigenvalues=None, eigenvectors=None):
+    data = tf.eye(sigma.shape[0], num_features)
+
+    if not eigenvectors or not eigenvectors:
+        eigenvalues, _, eigenvectors = tf.linalg.svd(sigma)
+        eigenvalues = tf.linalg.diag(eigenvalues)
+
+    data = tf.matmul(tf.matmul(eigenvectors, tf.sqrt(eigenvalues)), data)
+
+    return data
