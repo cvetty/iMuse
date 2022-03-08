@@ -3,7 +3,7 @@ from tensorflow.keras import Model
 from wavelet_encoder import WaveletEncoder
 from wavelet_decoder import WaveletDecoder
 
-from utils import wct
+from utils import wct, preprocess_feat, get_style_correlation_transform
 
 class WaveletAE(Model):
     def __init__(self):
@@ -47,3 +47,22 @@ class WaveletAE(Model):
         }
 
         return features, skips
+
+    def get_style_correlations(self, inputs, blocks = ['block1', 'block2', 'block3', 'block4'], ede=True):
+        _, _, encoder_feat = self.encoder(inputs)
+        correlations = []
+
+        def process_correlation(feature_map):
+            feat, _ = preprocess_feat(feature_map, center=True)
+            feat = tf.matmul(feat, feat, transpose_b=True) / (feat.shape[1] - 1)
+
+            return feat
+
+        for block in blocks:
+            corr = tf.map_fn(process_correlation if not ede else get_style_correlation_transform, encoder_feat[block])
+            # corr = tf.expand_dims(corr, 3)
+            # corr = tf.image.resize(corr, (corr.shape[1] // 2, corr.shape[2] // 2), 'nearest')
+            # corr = tf.squeeze(corr, 3)
+            correlations.append(corr)
+
+        return correlations

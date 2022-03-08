@@ -28,13 +28,13 @@ def preprocess_feat(feat, center=False):
     feat = tf.reshape(feat, (-1, feat.shape[-1]))
     feat = tf.transpose(feat)
 
-    feat_mean = tf.math.reduce_mean(feat, 1)
+    feat_mean_raw = tf.math.reduce_mean(feat, 1)
 
     if center:
-        feat_mean = tf.expand_dims(feat_mean, 1)
+        feat_mean = tf.expand_dims(feat_mean_raw, 1)
         feat = tf.subtract(feat, feat_mean)
 
-    return feat, feat_mean
+    return feat, feat_mean_raw
 
 
 def center_feat(feat):
