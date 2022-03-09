@@ -48,21 +48,30 @@ class WaveletAE(Model):
 
         return features, skips
 
-    def get_style_correlations(self, inputs, blocks = ['block1', 'block2', 'block3', 'block4'], ede=True):
+    def get_style_correlations(self, inputs, blocks=['block1', 'block2', 'block3', 'block4'], ede=True, normalize=True):
         _, _, encoder_feat = self.encoder(inputs)
         correlations = []
+        means = []
 
-        def process_correlation(feature_map):
+        def process_correlation(feature_map, normalize=normalize):
             feat, _ = preprocess_feat(feature_map, center=True)
             feat = tf.matmul(feat, feat, transpose_b=True) / (feat.shape[1] - 1)
 
+            if normalize:
+                feat = feat / tf.reduce_max(tf.abs(feat))
+
             return feat
 
-        for block in blocks:
-            corr = tf.map_fn(process_correlation if not ede else get_style_correlation_transform, encoder_feat[block])
-            # corr = tf.expand_dims(corr, 3)
-            # corr = tf.image.resize(corr, (corr.shape[1] // 2, corr.shape[2] // 2), 'nearest')
-            # corr = tf.squeeze(corr, 3)
-            correlations.append(corr)
+        def process_feat(feat):
+            if ede:
+                return get_style_correlation_transform(feat, normalize=normalize)
+            else:
+                return process_correlation(feat)
 
-        return correlations
+        for block in blocks:
+            corr = tf.map_fn(process_feat, encoder_feat[block])
+            mean = tf.map_fn(lambda feat: preprocess_feat(feat, center=False)[1], encoder_feat[block])
+            correlations.append(corr)
+            means.append(mean)
+
+        return correlations, means

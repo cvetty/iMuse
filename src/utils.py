@@ -52,13 +52,16 @@ def get_svd(feat):
     return tf.linalg.svd(feat)
 
 
-def get_style_correlation_transform(feat, return_mean=False):
+def get_style_correlation_transform(feat, return_mean=False, normalize=False):
     feat, mean = preprocess_feat(feat)
     s_e, _, s_v = get_svd(feat)
     # The inverse of the content singular values matrix operation (^-0.5)
     s_e = tf.pow(s_e, 0.5)
 
     EDE = tf.matmul(tf.matmul(s_v, tf.linalg.diag(s_e)), s_v, transpose_b=True)
+
+    if normalize:
+        EDE = EDE / tf.reduce_max(tf.abs(EDE))
 
     return (EDE, mean) if return_mean else EDE
 

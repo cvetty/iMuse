@@ -1,2 +1,2 @@
-model_checkpoint_path: "wavelet_autoencoder"
-all_model_checkpoint_paths: "wavelet_autoencoder"
+model_checkpoint_path: "vggish"
+all_model_checkpoint_paths: "vggish"
