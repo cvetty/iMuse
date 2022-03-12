@@ -1,5 +1,10 @@
+import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Layer, Conv2D, MaxPooling2D, GlobalMaxPooling2D
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
+
+from config import VGGISH_WEIGHTS_PATH
+from utils import get_style_correlation_transform, get_correlations, preprocess_feat
+
 
 class VGGish(Model):
     def __init__(self):
@@ -25,12 +30,10 @@ class VGGish(Model):
         self.conv2d_4_2 = Conv2D(512, (3, 3), strides=(1, 1), activation='relu', padding='same', name='conv4/conv4_2')
         self.pool_4 = MaxPooling2D((2, 2), strides=(2, 2), padding='same', name='pool4')
 
-        self.global_pool = GlobalMaxPooling2D()
+        self.load_weights(VGGISH_WEIGHTS_PATH)
 
-        self.load_weights('../weights/vggish')
-
-    def call(self, inputs):
-        skips = {
+    def call(self, inputs, encode_level = None):
+        feature_maps = {
             'block1': None,
             'block2': None,
             'block3': None,
@@ -39,22 +42,45 @@ class VGGish(Model):
 
         x = self.conv2d_1(inputs)
         x = self.pool_1(x)
-        skips['block1'] = x
+        feature_maps['block1'] = x
+
+        if encode_level == 1:
+            return x
 
         x = self.conv2d_2(x)
         x = self.pool_2(x)
-        skips['block2'] = x
+        feature_maps['block2'] = x
+
+        if encode_level == 2:
+            return x, feature_maps
 
         x = self.conv2d_3_1(x)
         x = self.conv2d_3_2(x)
         x = self.pool_3(x)
-        skips['block3'] = x
+        feature_maps['block3'] = x
+
+        if encode_level == 3:
+            return x, feature_maps
 
         x = self.conv2d_4_1(x)
         x = self.conv2d_4_2(x)
         x = self.pool_4(x)
-        skips['block4'] = x
+        feature_maps['block4'] = x
 
-        x = self.global_pool(x)
+        return x, feature_maps
 
-        return x, skips
+    def get_style_correlations(self, inputs, blocks=['block1', 'block2', 'block3', 'block4'], ede=True, normalize=True):
+        _, encoder_feat = self.call(inputs)
+        correlations = []
+        means = []
+
+        def process_feat(feat):
+            return get_style_correlation_transform(feat, normalize=normalize) if ede else get_correlations(feat, normalize=normalize)
+
+        for block in blocks:
+            corr = tf.map_fn(process_feat, encoder_feat[block])
+            mean = tf.map_fn(lambda feat: preprocess_feat(feat, center=False)[1], encoder_feat[block])
+            correlations.append(corr)
+            means.append(mean)
+
+        return correlations, means

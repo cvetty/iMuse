@@ -3,17 +3,14 @@ import librosa as lb
 from sklearn.decomposition import PCA
 
 import tensorflow as tf
+from vggish import VGGish
 
 from tensorflow.io import serialize_tensor
 from tensorflow.train import Example, Features
 
-import sys
-
 from wavelet_ae import WaveletAE
 from utils import resize_image, _bytes_feature
 from vggish_preprocessing.preprocess_sound import preprocess_sound
-
-tf.config.run_functions_eagerly(False)
 
 
 class DatasetGenerator:
@@ -21,14 +18,14 @@ class DatasetGenerator:
         self.max_dim_size = max_dim_size
         self.vgg_input_max_size = vgg_input_max_size
         self.wavelet_ae = WaveletAE()
+        self.vggish = VGGish()
         self.pca = PCA()
         self.pca_compressing_coeff = pca_compressing_coeff
 
-    def load_image(self, img_path):
+    def process_image(self, img_path):
         self.img_path = img_path
         self.img_bytes = tf.io.read_file(img_path)
-        self.img_raw = tf.image.decode_image(
-            self.img_bytes, channels=3, dtype=tf.float32)
+        self.img_raw = tf.image.decode_image(self.img_bytes, channels=3) / 255
         self.img_raw = resize_image(self.img_raw, self.max_dim_size)
 
         # Other usefull features
@@ -40,16 +37,6 @@ class DatasetGenerator:
 #         self.img_resized = tfa.image.gaussian_filter2d(self.img_resized, (6, 6), sigma=6e-1)
 #         self.img_resized = tf.image.resize_with_crop_or_pad(self.img_resized, self.max_dim_size, self.max_dim_size)
 
-    def load_music(self, music_path):
-        audio_data, sr = lb.load(music_path)
-        train_len = 10 * sr
-        random_start = np.random.randint(audio_data.shape[0] - train_len)
-        audio_data = audio_data[random_start: random_start + train_len]
-
-        self.spec = preprocess_sound(audio_data, sr)
-
-    def get_style_transormations(self):
-        feat, _ = self.wavelet_ae.get_features(tf.expand_dims(self.img_raw, 0))
         self.style_corr, self.style_means = self.wavelet_ae.get_style_correlations(
             tf.expand_dims(self.img_raw, 0), ede=False)
 
@@ -63,6 +50,26 @@ class DatasetGenerator:
             self.style_means[i] = tf.squeeze(self.style_means[i], 0)
             self.style_means[i] = tf.cast(self.style_means[i], tf.float16)
 
+    def process_music(self, music_path):
+        self.music_path = music_path
+        audio_data, sr = lb.load(music_path)
+        train_len = 10 * sr
+        random_start = np.random.randint(audio_data.shape[0] - train_len)
+        audio_data = audio_data[random_start: random_start + train_len]
+
+        self.spec = preprocess_sound(audio_data, sr)
+
+        self.vggish_feat_corr, self.vggish_feat_means = self.vggish.get_style_correlations(tf.expand_dims(self.spec, 3), ede=False)
+
+        for i in range(len(self.vggish_feat_corr)):
+            self.vggish_feat_corr[i] = tf.squeeze(self.vggish_feat_corr[i], 0)
+            self.vggish_feat_corr[i] = tf.cast(self.vggish_feat_corr[i], tf.float16)
+            self.vggish_feat_corr[i] = self.get_corr_pca(
+                self.vggish_feat_corr[i], self.vggish_feat_corr[i].shape[1] // self.pca_compressing_coeff)
+
+        for i in range(len(self.vggish_feat_means)):
+            self.vggish_feat_means[i] = tf.squeeze(self.vggish_feat_means[i], 0)
+            self.vggish_feat_means[i] = tf.cast(self.vggish_feat_means[i], tf.float16)
 
     def get_corr_pca(self, corr, n_components):
         feat = self.pca.fit_transform(corr.numpy())
@@ -75,23 +82,29 @@ class DatasetGenerator:
         return feat[:, :n_components], orthonormal_vectors[:n_components, :]
 
     def process(self, music, img):
-        self.load_image(img)
-        self.load_music(music)
-        self.get_style_transormations()
+        self.process_image(img)
+        self.process_music(music)
 
     def serialize_information(self):
         features = {
             'img_path': _bytes_feature(self.img_path.encode('utf-8'), raw_string=True),
-            'music_spec': _bytes_feature(serialize_tensor(self.spec)),
+            'music_path': _bytes_feature(self.music_path.encode('utf-8'), raw_string=True),
         }
 
         for i in range(1, 5):
-            features[f'block{i}_corr'] = _bytes_feature(
+            features[f'img_block{i}_corr'] = _bytes_feature(
                 serialize_tensor(self.style_corr[i-1][0]))
-            features[f'block{i}_orthonormal_vectors'] = _bytes_feature(
+            features[f'img_block{i}_orthonormal_vectors'] = _bytes_feature(
                 serialize_tensor(self.style_corr[i-1][1]))
-            features[f'block{i}_mean'] = _bytes_feature(
+            features[f'img_block{i}_mean'] = _bytes_feature(
                 serialize_tensor(self.style_means[i-1]))
+
+            features[f'music_block{i}_corr'] = _bytes_feature(
+                serialize_tensor(self.vggish_feat_corr[i-1][0]))
+            features[f'music_block{i}_orthonormal_vectors'] = _bytes_feature(
+                serialize_tensor(self.vggish_feat_corr[i-1][1]))
+            features[f'music_block{i}_mean'] = _bytes_feature(
+                serialize_tensor(self.vggish_feat_means[i-1]))
 
         return Example(
             features=Features(feature=features)

@@ -18,9 +18,9 @@ tf.get_logger().setLevel('ERROR')
 def generate_data():
     data = pd.read_csv(CSV_DATA_PATH, index_col=0)
     x_train, x_test, y_train, y_test = train_test_split(
-        data.music, data.img, test_size=0.08, stratify=data.quadrant, shuffle=True)
+        data.music, data.img, test_size=0.25, stratify=data.quadrant, shuffle=True)
     x_test, x_val, y_test, y_val = train_test_split(
-        x_test, y_test, test_size=0.15)
+        x_test, y_test, test_size=0.35)
 
     train_ds = generate_ds(x_train, y_train)
     test_ds = generate_ds(x_test, y_test)
@@ -44,7 +44,7 @@ def generate_data():
 
     write_as_TFRecords(
         dataset=val_ds,
-        target_dir=DATA_OUTPUT_TRAIN_DIR,
+        target_dir=DATA_OUTPUT_VAL_DIR,
         batch_size=len(list(val_ds)),
         datagen=dataset_gen
     )

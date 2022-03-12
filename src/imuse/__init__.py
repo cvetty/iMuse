@@ -1,0 +1,1 @@
+from imuse.model import IMuse

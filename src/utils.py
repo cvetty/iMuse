@@ -3,6 +3,7 @@ from tensorflow.nn import conv2d, conv2d_transpose
 from tensorflow.io import read_file
 from tensorflow.image import decode_image
 
+import pywt
 
 def _conv2d(x, kernel):
     return conv2d(x, kernel, strides=[1, 2, 2, 1], padding='SAME')
@@ -32,13 +33,13 @@ def resize_image(img, max_size):
         return tf.image.resize(img, (int(max_size * aspect_ratio), max_size))
 
 
-def preprocess_image(img, max_size = 512):
+def preprocess_image(img, max_size=512):
     img = img / 255
-    
+
     return resize_image(img, max_size)
 
 
-### WCT Related Function
+# WCT Related Function
 def preprocess_feat(feat, center=False):
     feat = tf.reshape(feat, (-1, feat.shape[-1]))
     feat = tf.transpose(feat)
@@ -77,19 +78,21 @@ def get_style_correlation_transform(feat, return_mean=False, normalize=False):
 
     if normalize:
         EDE -= tf.reduce_mean(feat, 0)
-        EDE /= tf.reduce_max(tf.abs(EDE))
+        EDE /= tf.math.reduce_std(EDE)
 
     return (EDE, mean) if return_mean else EDE
 
 
 def wct(content_feat_raw, style_feat_raw, alpha=1):
-    style_EDE, style_mean = get_style_correlation_transform(style_feat_raw, return_mean=True)
+    style_EDE, style_mean = get_style_correlation_transform(
+        style_feat_raw, return_mean=True)
     content_feat, content_mean = preprocess_feat(content_feat_raw, center=True)
 
     c_e, _, c_v = get_svd(content_feat)
     c_e = tf.pow(c_e, -0.5)
 
-    content_EDE = tf.matmul(tf.matmul(c_v, tf.linalg.diag(c_e)), c_v, transpose_b=True)
+    content_EDE = tf.matmul(
+        tf.matmul(c_v, tf.linalg.diag(c_e)), c_v, transpose_b=True)
     content_whitened = tf.matmul(content_EDE, content_feat)
 
     final_out = tf.matmul(style_EDE, content_whitened)
@@ -118,17 +121,28 @@ def sample_from_corr_matrix(sigma, num_features=None, eigenvalues=None, eigenvec
     return data
 
 
-### Data Generator Helpers
-def _bytes_feature(value, raw_string = False):
+# Data Generator Helpers
+def _bytes_feature(value, raw_string=False):
     """Returns a bytes_list from a string / byte."""
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value.numpy() if not raw_string else value]))
 
 
 def normalized_wt_downsampling(x, wavelet, level):
-        LL = pywt.wavedec2(x, wavelet, 'periodization', level)[0]
-        LL = LL / np.abs(LL).max()
+    LL = pywt.wavedec2(x, wavelet, 'periodization', level)[0]
+    LL = LL / np.abs(LL).max()
 
-        return LL
+    return LL
+
+
+def get_correlations(feature_map, normalize=True):
+    feat, _ = preprocess_feat(feature_map, center=True)
+    feat = tf.matmul(feat, feat, transpose_b=True) / (feat.shape[1] - 1)
+
+    if normalize:
+        feat -= tf.reduce_mean(feat, 0)
+        feat /= tf.math.reduce_std(feat)
+
+    return feat
 
 
 def per_channel_wd(img, level=1, wavelet='haar'):

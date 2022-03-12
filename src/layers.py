@@ -1,8 +1,9 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, ReLU, Conv2D
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Layer, ReLU, Conv2D, Conv1D, MaxPooling1D, BatchNormalization, Attention, Flatten, Add, Concatenate
 from utils import _conv2d, _conv2d_transpose
 
-
+### Wavelet AE ###
 class WaveletPooling(Layer):
     """
     Wavelet Pooing Custom Layer
@@ -14,17 +15,23 @@ class WaveletPooling(Layer):
         square_of_2 = tf.math.sqrt(tf.constant(2, dtype=tf.float32))
         L = tf.math.divide(
             tf.constant(1, dtype=tf.float32),
-            tf.math.multiply(square_of_2, tf.constant([[1, 1]], dtype=tf.float32))
+            tf.math.multiply(square_of_2, tf.constant(
+                [[1, 1]], dtype=tf.float32))
         )
         H = tf.math.divide(
             tf.constant(1, dtype=tf.float32),
-            tf.math.multiply(square_of_2, tf.constant([[-1, 1]], dtype=tf.float32))
+            tf.math.multiply(square_of_2, tf.constant(
+                [[-1, 1]], dtype=tf.float32))
         )
 
-        self.LL = tf.reshape(tf.math.multiply(tf.transpose(L), L), (1, 2, 2, 1))
-        self.LH = tf.reshape(tf.math.multiply(tf.transpose(L), H), (1, 2, 2, 1))
-        self.HL = tf.reshape(tf.math.multiply(tf.transpose(H), L), (1, 2, 2, 1))
-        self.HH = tf.reshape(tf.math.multiply(tf.transpose(H), H), (1, 2, 2, 1))
+        self.LL = tf.reshape(tf.math.multiply(
+            tf.transpose(L), L), (1, 2, 2, 1))
+        self.LH = tf.reshape(tf.math.multiply(
+            tf.transpose(L), H), (1, 2, 2, 1))
+        self.HL = tf.reshape(tf.math.multiply(
+            tf.transpose(H), L), (1, 2, 2, 1))
+        self.HH = tf.reshape(tf.math.multiply(
+            tf.transpose(H), H), (1, 2, 2, 1))
 
     def call(self, inputs):
         LL, LH, HL, HH = self.repeat_filters(inputs.shape[-1])
@@ -62,17 +69,23 @@ class WaveletUnpooling(Layer):
         square_of_2 = tf.math.sqrt(tf.constant(2, dtype=tf.float32))
         L = tf.math.divide(
             tf.constant(1, dtype=tf.float32),
-            tf.math.multiply(square_of_2, tf.constant([[1, 1]], dtype=tf.float32))
+            tf.math.multiply(square_of_2, tf.constant(
+                [[1, 1]], dtype=tf.float32))
         )
         H = tf.math.divide(
             tf.constant(1, dtype=tf.float32),
-            tf.math.multiply(square_of_2, tf.constant([[-1, 1]], dtype=tf.float32))
+            tf.math.multiply(square_of_2, tf.constant(
+                [[-1, 1]], dtype=tf.float32))
         )
 
-        self.LL = tf.reshape(tf.math.multiply(tf.transpose(L), L), (1, 2, 2, 1))
-        self.LH = tf.reshape(tf.math.multiply(tf.transpose(L), H), (1, 2, 2, 1))
-        self.HL = tf.reshape(tf.math.multiply(tf.transpose(H), L), (1, 2, 2, 1))
-        self.HH = tf.reshape(tf.math.multiply(tf.transpose(H), H), (1, 2, 2, 1))
+        self.LL = tf.reshape(tf.math.multiply(
+            tf.transpose(L), L), (1, 2, 2, 1))
+        self.LH = tf.reshape(tf.math.multiply(
+            tf.transpose(L), H), (1, 2, 2, 1))
+        self.HL = tf.reshape(tf.math.multiply(
+            tf.transpose(H), L), (1, 2, 2, 1))
+        self.HH = tf.reshape(tf.math.multiply(
+            tf.transpose(H), H), (1, 2, 2, 1))
 
     def call(self, inputs):
         LL_in, LH_in, HL_in, HH_in, tensor_in = inputs
@@ -140,3 +153,61 @@ class CNNBlock(Layer):
         x = self.activation(x)
 
         return x
+
+### IMuse Model ###
+class ExtractorCNNBlock(Model):
+    def __init__(self, filters, kernel):
+        super().__init__()
+        self.conv1 = Conv1D(filters, (kernel,),
+                            activation='relu', padding='same')
+        self.pool = MaxPooling1D()
+        self.conv2 = Conv1D(filters * 2, (kernel,),
+                            activation='relu', padding='same')
+
+    def call(self, inputs):
+        x = self.conv1(inputs)
+        x = self.pool(x)
+        x = self.conv2(x)
+
+        return x
+
+
+class FeatureExtractor(Model):
+    def __init__(self, filters = 16):
+        super().__init__()
+
+        self.block1 = ExtractorCNNBlock(filters, 1)
+        self.block2 = ExtractorCNNBlock(filters, 3)
+        self.block3 = ExtractorCNNBlock(filters, 5)
+        self.block4 = ExtractorCNNBlock(filters, 7)
+        self.bn = BatchNormalization()
+        self.flatten = Flatten()
+        self.attention = Attention()
+
+    def call(self, inputs, flatten=False):
+        block1_enc = self.block1(inputs)
+        block2_enc = self.block2(inputs)
+        block3_enc = self.block3(inputs)
+        block4_enc = self.block4(inputs)
+
+        x = Add()([block1_enc, block2_enc, block3_enc, block4_enc])
+        x = self.bn(x)
+
+        att = self.attention([x, x])
+        x = Concatenate()([x, att])
+
+        if flatten:
+            x = self.flatten(x)
+
+        return x
+
+
+class Sampler_Z(Layer):
+    def call(self, inputs):
+        mu, rho = inputs
+        sd = tf.math.log(1 + tf.math.exp(rho))
+        batch_size = tf.shape(mu)[0]
+        dim_z = tf.shape(mu)[1]
+        z_sample = mu + sd * tf.random.normal(shape=(batch_size, dim_z))
+
+        return z_sample, sd

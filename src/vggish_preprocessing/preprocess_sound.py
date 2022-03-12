@@ -5,6 +5,8 @@ import vggish_preprocessing.mel_features as mel_features
 import vggish_preprocessing.vggish_params as vggish_params
 import resampy
 
+import tensorflow as tf
+
 def preprocess_sound(data, sample_rate):
   """Converts audio waveform into an array of examples for VGGish.
 
@@ -49,6 +51,8 @@ def preprocess_sound(data, sample_rate):
       log_mel,
       window_length=example_window_length,
       hop_length=example_hop_length)
-  return log_mel_examples
+
+  
+  return tf.convert_to_tensor(log_mel_examples, tf.float32)
 
 
