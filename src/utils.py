@@ -23,6 +23,21 @@ def load_image(image_path):
     return image
 
 
+def resize_image(img, max_size):
+    aspect_ratio = img.shape[0] / img.shape[1]
+
+    if (aspect_ratio > 1):
+        return tf.image.resize(img, (max_size, int(max_size // aspect_ratio)))
+    else:
+        return tf.image.resize(img, (int(max_size * aspect_ratio), max_size))
+
+
+def preprocess_image(img, max_size = 512):
+    img = img / 255
+    
+    return resize_image(img, max_size)
+
+
 ### WCT Related Function
 def preprocess_feat(feat, center=False):
     feat = tf.reshape(feat, (-1, feat.shape[-1]))
@@ -61,7 +76,8 @@ def get_style_correlation_transform(feat, return_mean=False, normalize=False):
     EDE = tf.matmul(tf.matmul(s_v, tf.linalg.diag(s_e)), s_v, transpose_b=True)
 
     if normalize:
-        EDE = EDE / tf.reduce_max(tf.abs(EDE))
+        EDE -= tf.reduce_mean(feat, 0)
+        EDE /= tf.reduce_max(tf.abs(EDE))
 
     return (EDE, mean) if return_mean else EDE
 
@@ -100,3 +116,25 @@ def sample_from_corr_matrix(sigma, num_features=None, eigenvalues=None, eigenvec
     data = tf.matmul(tf.matmul(eigenvectors, tf.sqrt(eigenvalues)), data)
 
     return data
+
+
+### Data Generator Helpers
+def _bytes_feature(value, raw_string = False):
+    """Returns a bytes_list from a string / byte."""
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value.numpy() if not raw_string else value]))
+
+
+def normalized_wt_downsampling(x, wavelet, level):
+        LL = pywt.wavedec2(x, wavelet, 'periodization', level)[0]
+        LL = LL / np.abs(LL).max()
+
+        return LL
+
+
+def per_channel_wd(img, level=1, wavelet='haar'):
+    r, g, b = tf.unstack(img, axis=2)
+    r = normalized_wt_downsampling(r, wavelet, level)
+    g = normalized_wt_downsampling(g, wavelet, level)
+    b = normalized_wt_downsampling(b, wavelet, level)
+
+    return tf.stack([r, g, b], axis=2)
