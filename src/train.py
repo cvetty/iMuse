@@ -69,11 +69,30 @@ def main(config):
     val_spe = 8
     
     feature_mapper = FeaturesMapperBlock(config.block)
-    # feature_mapper.build([(32, 64, 4), (32, 64), (32, 512)])
     feature_mapper.compile(tf.keras.optimizers.Adam())
-    feature_mapper.fit(train_ds, steps_per_epoch = train_spe, epochs=10)
+    feature_mapper.fit(
+        train_ds,
+        steps_per_epoch = train_spe,
+        validation_data = val_ds,
+        validation_steps = val_spe,
+        epochs=10
+    )
     pass
 
+
+# def get_callbacks():
+#     return [
+#         TensorBoard(log_dir=log_dir, update_freq = tensoarboard_fq),
+#         EarlyStopping(monitor = 'val_loss', min_delta = 1e-3, patience = 3, verbose = 1),
+#         ModelCheckpoint(
+#             filepath = './checkpoints/Ipix.{epoch}.h5',
+#             monitor='val_loss',
+#             mode='max',
+#             save_best_only= True,
+#             verbose = 1
+#         ),
+#         LearningRateScheduler(schedule, verbose=1)
+#     ]
 
 def preprocess_dataset(block_level = 1):
     # Global shuffle on all files
