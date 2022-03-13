@@ -1,9 +1,11 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.nn import conv2d, conv2d_transpose
 from tensorflow.io import read_file
 from tensorflow.image import decode_image
 
 import pywt
+
 
 def _conv2d(x, kernel):
     return conv2d(x, kernel, strides=[1, 2, 2, 1], padding='SAME')
@@ -152,3 +154,15 @@ def per_channel_wd(img, level=1, wavelet='haar'):
     b = normalized_wt_downsampling(b, wavelet, level)
 
     return tf.stack([r, g, b], axis=2)
+
+# vae loss function -- only the negative log-likelihood part,
+# since we use add_loss for the KL divergence part
+def partial_vae_loss(x_true, model):
+    # x_recons_logits = model.encode_and_decode(x_true)
+    x_recons_logits = model(x_true)
+    # compute cross entropy loss for each dimension of every datapoint
+    raw_cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
+        labels=x_true, logits=x_recons_logits)
+    neg_log_likelihood = tf.math.reduce_sum(raw_cross_entropy, axis=[1, 2, 3])
+
+    return tf.math.reduce_mean(neg_log_likelihood)

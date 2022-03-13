@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
 
 from config import VGGISH_WEIGHTS_PATH
 from utils import get_style_correlation_transform, get_correlations, preprocess_feat
@@ -29,15 +29,18 @@ class VGGish(Model):
         self.conv2d_4_1 = Conv2D(512, (3, 3), strides=(1, 1), activation='relu', padding='same', name='conv4/conv4_1')
         self.conv2d_4_2 = Conv2D(512, (3, 3), strides=(1, 1), activation='relu', padding='same', name='conv4/conv4_2')
         self.pool_4 = MaxPooling2D((2, 2), strides=(2, 2), padding='same', name='pool4')
-
+        
         self.load_weights(VGGISH_WEIGHTS_PATH)
+
+        self.global_pool = GlobalAveragePooling2D()
 
     def call(self, inputs, encode_level = None):
         feature_maps = {
             'block1': None,
             'block2': None,
             'block3': None,
-            'block4': None
+            'block4': None,
+            'global_stats': None
         }
 
         x = self.conv2d_1(inputs)
@@ -67,6 +70,8 @@ class VGGish(Model):
         x = self.pool_4(x)
         feature_maps['block4'] = x
 
+        feature_maps['global_stats'] = self.global_pool(x)
+
         return x, feature_maps
 
     def get_style_correlations(self, inputs, blocks=['block1', 'block2', 'block3', 'block4'], ede=True, normalize=True):
@@ -83,4 +88,5 @@ class VGGish(Model):
             correlations.append(corr)
             means.append(mean)
 
-        return correlations, means
+        return correlations, means, encoder_feat['global_stats']
+        

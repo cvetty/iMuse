@@ -59,7 +59,9 @@ class DatasetGenerator:
 
         self.spec = preprocess_sound(audio_data, sr)
 
-        self.vggish_feat_corr, self.vggish_feat_means = self.vggish.get_style_correlations(tf.expand_dims(self.spec, 3), ede=False)
+        self.vggish_feat_corr, self.vggish_feat_means, self.vggish_global_stats = self.vggish.get_style_correlations(tf.expand_dims(self.spec, 3), ede=False)
+        self.vggish_global_stats = tf.squeeze(self.vggish_global_stats, 0)
+        self.vggish_global_stats = tf.cast(self.vggish_global_stats, tf.float16)
 
         for i in range(len(self.vggish_feat_corr)):
             self.vggish_feat_corr[i] = tf.squeeze(self.vggish_feat_corr[i], 0)
@@ -89,6 +91,7 @@ class DatasetGenerator:
         features = {
             'img_path': _bytes_feature(self.img_path.encode('utf-8'), raw_string=True),
             'music_path': _bytes_feature(self.music_path.encode('utf-8'), raw_string=True),
+            'music_global_stats': _bytes_feature(serialize_tensor(self.vggish_global_stats))
         }
 
         for i in range(1, 5):

@@ -14,13 +14,15 @@ warnings.filterwarnings('ignore')
 tf_record_options = tf.io.TFRecordOptions(compression_type="GZIP")
 tf.get_logger().setLevel('ERROR')
 
+import sys
+
 
 def generate_data():
     data = pd.read_csv(CSV_DATA_PATH, index_col=0)
     x_train, x_test, y_train, y_test = train_test_split(
-        data.music, data.img, test_size=0.25, stratify=data.quadrant, shuffle=True)
+        data.music, data.img, test_size=0.15, stratify=data.quadrant, shuffle=True)
     x_test, x_val, y_test, y_val = train_test_split(
-        x_test, y_test, test_size=0.35)
+        x_test, y_test, test_size=0.40)
 
     train_ds = generate_ds(x_train, y_train)
     test_ds = generate_ds(x_test, y_test)

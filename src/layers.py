@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Layer, ReLU, Conv2D, Conv1D, MaxPooling1D, BatchNormalization, Attention, Flatten, Add, Concatenate
+
 from utils import _conv2d, _conv2d_transpose
 
 ### Wavelet AE ###
@@ -210,4 +211,4 @@ class Sampler_Z(Layer):
         dim_z = tf.shape(mu)[1]
         z_sample = mu + sd * tf.random.normal(shape=(batch_size, dim_z))
 
-        return z_sample, sd
+        return z_sample, sd    

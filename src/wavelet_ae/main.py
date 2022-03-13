@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import Model
-from wavelet_encoder import WaveletEncoder
-from wavelet_decoder import WaveletDecoder
+from wavelet_ae.wavelet_encoder import WaveletEncoder
+from wavelet_ae.wavelet_decoder import WaveletDecoder
 
 from utils import wct, preprocess_feat, get_style_correlation_transform, get_correlations
 from config import WAVELET_AE_WEIGHTS_PATH
