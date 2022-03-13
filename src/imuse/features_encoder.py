@@ -1,7 +1,8 @@
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, Reshape, Add, Flatten, Dense, Concatenate
 
-from layers import Sampler_Z, FeatureExtractor
+from layers import Sampler, FeatureExtractor
+import sys
 
 class FeaturesEncoder(Model):
     def __init__(self, block_level = 1):
@@ -31,7 +32,7 @@ class FeaturesEncoder(Model):
         ])
 
         self.flatten = Flatten()
-        self.sampler = Sampler_Z()
+        self.sampler = Sampler()
         self.dense_mean = Dense(self.latent_dims)
         self.dense_std = Dense(self.latent_dims)
         self.gs_concat = Concatenate()
@@ -51,8 +52,8 @@ class FeaturesEncoder(Model):
 
         x = self.flatten(x)
         mu = self.dense_mean(x)
-        sigma = self.dense_std(x)
+        log_variance = self.dense_std(x)
 
-        z_sample, sd = self.sampler((mu, sigma))
+        z_sample = self.sampler((mu, log_variance))
 
-        return z_sample, mu, sd, global_stats
+        return z_sample, mu, log_variance, global_stats

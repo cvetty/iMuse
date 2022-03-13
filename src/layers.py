@@ -3,6 +3,8 @@ from tensorflow.keras import Model
 from tensorflow.keras.layers import Layer, ReLU, Conv2D, Conv1D, MaxPooling1D, BatchNormalization, Attention, Flatten, Add, Concatenate
 
 from utils import _conv2d, _conv2d_transpose
+import sys
+
 
 ### Wavelet AE ###
 class WaveletPooling(Layer):
@@ -203,12 +205,13 @@ class FeatureExtractor(Model):
         return x
 
 
-class Sampler_Z(Layer):
+class Sampler(Layer):
     def call(self, inputs):
-        mu, rho = inputs
-        sd = tf.math.log(1 + tf.math.exp(rho))
-        batch_size = tf.shape(mu)[0]
-        dim_z = tf.shape(mu)[1]
-        z_sample = mu + sd * tf.random.normal(shape=(batch_size, dim_z))
+        mu, log_variance = inputs
+        batch = tf.shape(mu)[0]
+        dim = tf.shape(mu)[1]
 
-        return z_sample, sd    
+        epsilon = tf.random.normal(shape=(batch, dim))
+        sampled_point = mu + tf.exp(log_variance / 2) * epsilon
+
+        return sampled_point
