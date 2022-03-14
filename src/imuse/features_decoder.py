@@ -52,5 +52,6 @@ class FeaturesDecoder(Model):
         corr_out = self.corr_out(x)
         corr_means = self.corr_means_out(x)
 
+        corr = tf.matmul(corr_out, corr_vectors)
 
-        return corr_out, corr_vectors, corr_means
+        return corr, corr_means

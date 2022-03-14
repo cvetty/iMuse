@@ -18,9 +18,9 @@ class FeaturesMapperBlock(Model):
 
     def call(self, inputs):
         z_sample, self.mu, self.log_variance, global_stats = self.encoder(inputs[0], inputs[1], inputs[2])
-        corr, vectors, means  = self.decoder(z_sample, global_stats)
+        corr, means  = self.decoder(z_sample, global_stats)
         
-        return corr, vectors, means
+        return corr, means
 
 
     def train_step(self, data):

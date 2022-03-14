@@ -50,6 +50,8 @@ def _parse_function(record, block_level = 1):
     img_vectors = parse_tensor(parsed_data[f'img_block{block_level}_orthonormal_vectors'], tf.float16)
     img_vectors = tf.ensure_shape(img_vectors, corr_shape[::-1])
 
+    img_corr = tf.matmul(img_corr, img_vectors)
+
     img_means = parse_tensor(parsed_data[f'img_block{block_level}_mean'], tf.float16)
     img_means = tf.ensure_shape(img_means, means_shape)
 
@@ -59,7 +61,7 @@ def _parse_function(record, block_level = 1):
     music_means = parse_tensor(parsed_data[f'music_block{block_level}_mean'], tf.float16)
     music_means = tf.ensure_shape(music_means, means_shape)
     
-    return (music_corr, music_means, music_global_stats), (img_corr, img_vectors, img_means)
+    return (music_corr, music_means, music_global_stats), (img_corr, img_means)
 
 
 def main(config):
@@ -87,7 +89,7 @@ def get_callbacks(tensorboard_fq, config):
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
         # EarlyStopping(monitor = 'val_loss', min_delta = 1e-3, patience = 10, verbose = 1),
         ModelCheckpoint(
-            filepath = f'../checkpoints/FeaturesMapper{config.block}/{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
+            filepath = f'../checkpoints/FeaturesMapper{config.block}.{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
             monitor='val_loss',
             mode='min',
             save_weights_only=True,
