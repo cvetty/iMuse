@@ -6,7 +6,7 @@ from imuse.features_encoder import FeaturesEncoder
 from imuse.features_decoder import FeaturesDecoder
 import sys
 class FeaturesMapperBlock(Model):
-    def __init__(self, block_level = 1, kl_weight=1):
+    def __init__(self, block_level = 1, kl_weight=2):
         super(FeaturesMapperBlock, self).__init__()
         self._name = 'FeaturesMapperBlock'
         self.block_level = block_level
@@ -37,7 +37,7 @@ class FeaturesMapperBlock(Model):
 
         self.optimizer.apply_gradients(zip(gradients, training_vars))
         
-        return {'kl_loss': kl_loss, 'mse': reconstruction_loss}
+        return {'kl_loss': kl_loss, 'mse': reconstruction_loss, 'loss': loss}
 
     def test_step(self, data):
         x, y = data
@@ -47,7 +47,7 @@ class FeaturesMapperBlock(Model):
         kl_loss = self._calculate_kl_loss()
         loss = self.kl_weight * kl_loss + reconstruction_loss
 
-        return {'kl_loss': kl_loss, 'mse': reconstruction_loss}
+        return {'kl_loss': kl_loss, 'mse': reconstruction_loss, 'loss': loss}
 
     def _calculate_combined_loss(self, y_target, y_predicted):
         reconstruction_loss = self._calculate_reconstruction_loss(y_target, y_predicted)

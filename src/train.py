@@ -2,13 +2,13 @@ from distutils.command.config import config
 import tensorflow as tf
 from imuse import FeaturesMapperBlock
 from tensorflow.io import FixedLenFeature, parse_tensor, parse_single_example
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
 
 import argparse
 from pathlib import Path
+from datetime import datetime
 
 from config import BATCH_SIZE, EPOCHS, DATA_OUTPUT_TRAIN_DIR, DATA_OUTPUT_TEST_DIR, DATA_OUTPUT_VAL_DIR
-
-import sys
 
 TRAIN_DIR = Path(DATA_OUTPUT_TRAIN_DIR)
 VAL_DIR = Path(DATA_OUTPUT_VAL_DIR) / "0.tfrecord"
@@ -69,30 +69,33 @@ def main(config):
     val_spe = 8
     
     feature_mapper = FeaturesMapperBlock(config.block)
-    feature_mapper.compile(tf.keras.optimizers.Adam())
+    feature_mapper.compile(tf.keras.optimizers.Adam(5e-5))
     feature_mapper.fit(
         train_ds,
         steps_per_epoch = train_spe,
         validation_data = val_ds,
         validation_steps = val_spe,
-        epochs=10
+        epochs=config.epochs,
+        callbacks=get_callbacks(train_spe / 5, config)
     )
-    pass
 
 
-# def get_callbacks():
-#     return [
-#         TensorBoard(log_dir=log_dir, update_freq = tensoarboard_fq),
-#         EarlyStopping(monitor = 'val_loss', min_delta = 1e-3, patience = 3, verbose = 1),
-#         ModelCheckpoint(
-#             filepath = './checkpoints/Ipix.{epoch}.h5',
-#             monitor='val_loss',
-#             mode='max',
-#             save_best_only= True,
-#             verbose = 1
-#         ),
-#         LearningRateScheduler(schedule, verbose=1)
-#     ]
+def get_callbacks(tensorboard_fq, config):
+    log_dir = "../logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    return [
+        TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
+        # EarlyStopping(monitor = 'val_loss', min_delta = 1e-3, patience = 10, verbose = 1),
+        ModelCheckpoint(
+            filepath = f'../checkpoints/FeaturesMapper{config.block}/{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
+            monitor='val_loss',
+            mode='min',
+            save_weights_only=True,
+            save_best_only= True,
+            verbose = 1
+        ),
+    ]
+
 
 def preprocess_dataset(block_level = 1):
     # Global shuffle on all files

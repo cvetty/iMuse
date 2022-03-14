@@ -12,4 +12,4 @@ DATA_OUTPUT_TEST_DIR = str(BASE_DIR.joinpath('data', 'tfrecords', 'test'))
 DATA_OUTPUT_VAL_DIR = str(BASE_DIR.joinpath('data', 'tfrecords', 'val'))
 
 BATCH_SIZE = 32
-EPOCHS = 1000
+EPOCHS = 50_000
