@@ -89,7 +89,7 @@ def get_callbacks(tensorboard_fq, config):
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
         # EarlyStopping(monitor = 'val_loss', min_delta = 1e-3, patience = 10, verbose = 1),
         ModelCheckpoint(
-            filepath = f'../checkpoints/FeaturesMapper{config.block}.{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
+            filepath = f'../checkpoints/FeaturesMapper{config.block}-2.{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
             monitor='val_loss',
             mode='min',
             save_weights_only=True,

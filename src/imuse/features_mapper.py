@@ -59,10 +59,7 @@ class FeaturesMapperBlock(Model):
 
 
     def _calculate_reconstruction_loss(self, y_target, y_predicted):
-        reconstruction_loss = 0
-
-        for i, target in enumerate(y_target):
-            reconstruction_loss += self._calculate_mse_loss(target, y_predicted[i])
+        reconstruction_loss = 0.6 * self._calculate_mse_loss(y_target[0], y_predicted[0]) + 0.4 * self._calculate_mse_loss(y_target[1], y_predicted[1])
         
         return reconstruction_loss
 

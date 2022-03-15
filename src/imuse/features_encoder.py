@@ -1,8 +1,7 @@
 from tensorflow.keras import Model, Sequential
-from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, Reshape, Add, Flatten, Dense, Concatenate
+from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, Reshape, Add, Flatten, Dense, Concatenate, MaxPooling1D
 
 from layers import Sampler, FeatureExtractor
-import sys
 
 class FeaturesEncoder(Model):
     def __init__(self, block_level = 1):
@@ -12,13 +11,11 @@ class FeaturesEncoder(Model):
         self.first_layer_size = 2 ** (block_level + 3 if block_level < 4 else 6)
         self.latent_dims = self.first_layer_size / 2
 
-        self.feature_extractor = FeatureExtractor(self.first_layer_size // 2)
+        self.feature_extractor1 = FeatureExtractor(self.first_layer_size)
+        self.feature_extractor2 = FeatureExtractor(self.first_layer_size * 2, levels=1)
+        self.preprocessing_pool = MaxPooling1D()
 
-        self.preprocessing_conv = Conv1D(self.first_layer_size, 1, activation='relu')
-
-        self.conv1 = Conv1D(self.first_layer_size * 2, 3, activation='relu', padding='same', strides=2)
-        self.bn1 = BatchNormalization()
-
+        self.conv1 = Conv1D(self.first_layer_size * 2**2, 3, activation='relu', padding='same', dilation_rate=2)
         self.conv2 = Conv1D(self.first_layer_size * 2**2, 3, activation='relu', padding='same', strides=2)
         self.bn2 = BatchNormalization()
 
@@ -38,10 +35,10 @@ class FeaturesEncoder(Model):
         self.gs_concat = Concatenate()
 
     def call(self, inputs, means_vector, global_stats):
-        x = self.feature_extractor(inputs)
-        x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.feature_extractor1(inputs)
+        x = self.feature_extractor2(x)
 
+        x = self.conv1(x)
         x = self.conv2(x)
         x = self.bn2(x)
 
