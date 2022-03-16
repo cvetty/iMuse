@@ -7,9 +7,13 @@ class FeaturesDecoder(Model):
     def __init__(self, block_level = 1):
         super().__init__()
         self._name = f'FeaturesDecoder{block_level}'
+        self.block_level = block_level
 
         self.sample_size = 2 ** (block_level + 2)
         self.first_layer_size = 2 ** ((block_level + 3 if block_level < 4 else 6) + 2)
+
+        if self.block_level > 2:
+            self.preprocessing_dense = Dense(self.first_layer_size // 2**4, activation='relu')
 
         self.sample_dense = Dense(self.sample_size * self.first_layer_size)
 
@@ -37,6 +41,10 @@ class FeaturesDecoder(Model):
         self.means_dense2 = Dense(2**(block_level + 5))
 
     def call(self, inputs, global_stats):
+        ## Dims reduction happens here as well :D
+        if self.block_level > 2:
+            inputs = self.preprocessing_dense(inputs)
+
         x = self.sample_dense(inputs)
         x = self.sample_reshape(x)
         x = self.add([x, global_stats])

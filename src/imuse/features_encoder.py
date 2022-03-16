@@ -8,7 +8,7 @@ class FeaturesEncoder(Model):
     def __init__(self, block_level=1):
         super().__init__()
         self._name = f'FeaturesEncoder{block_level}'
-
+        self.block_level = block_level
         self.first_layer_size = 2 ** (block_level +
                                       3 if block_level < 4 else 6)
         self.latent_dims = self.first_layer_size / 2
@@ -39,6 +39,10 @@ class FeaturesEncoder(Model):
         ])
 
         self.flatten = Flatten()
+
+        if block_level > 2:
+            self.postprocessing_dense = Dense(self.latent_dims // 4, activation='relu')
+
         self.sampler = Sampler()
         self.dense_mean = Dense(self.latent_dims)
         self.dense_std = Dense(self.latent_dims)
@@ -58,6 +62,10 @@ class FeaturesEncoder(Model):
         x = self.add([x, global_stats])
 
         x = self.flatten(x)
+        
+        ### Dims reduction happens here
+        if self.block_level > 2:
+            x = self.postprocessing_dense(x)
 
         mu = self.dense_mean(x)
         log_variance = self.dense_std(x)
