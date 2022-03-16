@@ -1,9 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Layer, ReLU, Conv2D, Conv1D, Conv1DTranspose, BatchNormalization, Attention, Flatten, Add, Concatenate
+from tensorflow.keras.layers import Layer, ReLU, MaxPool2D, Conv2D, Conv2DTranspose, BatchNormalization, Attention, Concatenate, UpSampling2D
 
 from utils import _conv2d, _conv2d_transpose
-import sys
+
+from config import DROPOUT_RATE
 
 
 ### Wavelet AE ###
@@ -157,99 +158,69 @@ class CNNBlock(Layer):
 
         return x
 
-### IMuse Model ###
-class ExtractorCNNBlock(Model):
-    def __init__(self, filters, kernel, levels, unpool = False):
-        super().__init__()
-        self.unpool = unpool
-        self.levels = levels
-
-        if unpool:
-            self.conv1 = Conv1DTranspose(filters if levels > 1 else filters // 2, (kernel,),
-                                activation='relu', padding='same', strides=2)
-            if levels > 1:
-                self.conv2 = Conv1DTranspose(filters // 2, (kernel,),
-                                    activation='relu', padding='same')
-        else:
-            self.conv1 = Conv1D(filters if levels > 1 else filters * 2, (kernel,),
-                                activation='relu', padding='same', strides=2)
-            if levels > 1:
-                self.conv2 = Conv1D(filters * 2, (kernel,),
-                                    activation='relu', padding='same')
-
-    def call(self, inputs):
-        x = self.conv1(inputs)
-
-        if self.levels > 1:
-            x = self.conv2(x)
-
-        return x
-
 
 class FeatureExtractor(Model):
-    def __init__(self, out_filters = 16, levels = 2):
+    def __init__(self, filters, kernel_size = 3, pool = None, levels=2, dilation_rate = 1):
         super().__init__()
+        self.pool = None
+        self.levels = levels
 
-        self.block1 = ExtractorCNNBlock(out_filters // 2, 1, levels) # -> OUT = None, out_filters
-        self.block2 = ExtractorCNNBlock(out_filters // 2, 3, levels)
-        self.block3 = ExtractorCNNBlock(out_filters // 2, 5, levels)
-        self.block4 = ExtractorCNNBlock(out_filters // 2, 7, levels)
+        self.conv = Conv2D(filters, kernel_size, activation='relu', padding='same', strides=2 if pool == 'conv' and levels == 1 else 1, dilation_rate=dilation_rate)
+
+        if pool == 'max' and self.levels > 1:
+            self.pool = MaxPool2D()
+        elif pool == 'conv' and self.levels > 1:
+            self.pool = Conv2D(filters, kernel_size, activation='relu', padding='same', strides=2)
+
         self.bn = BatchNormalization()
-        self.flatten = Flatten()
         self.attention = Attention()
+        self.concat = Concatenate()
+        self.postprocessing_conv = Conv2D(filters, 1, activation='relu')
 
-        self.postprocessing_conv = Conv1D(out_filters, 1, activation='relu')
-
-    def call(self, inputs, flatten=False):
-        block1_enc = self.block1(inputs)
-        block2_enc = self.block2(inputs)
-        block3_enc = self.block3(inputs)
-        block4_enc = self.block4(inputs)
-
-        x = Add()([block1_enc, block2_enc, block3_enc, block4_enc])
+    def call(self, inputs):
+        x = self.conv(inputs)
         x = self.bn(x)
 
-        att = self.attention([x, x])
-        x = Concatenate()([x, att])
+        if self.pool and self.levels > 1:
+            x = self.pool(x)
 
-        if flatten:
-            x = self.flatten(x)
-        else:
-            x = self.postprocessing_conv(x)
+        att = self.attention([x, x])
+        x = self.concat([x, att])
+
+        x = self.postprocessing_conv(x)
         
         return x
 
 
 class FeatureExtractorTranspose(Model):
-    def __init__(self, out_filters = 16, levels = 2):
+    def __init__(self, filters, kernel_size = 3, upsampling = None, levels = 2):
         super().__init__()
+        self.upsampling = None
+        self.levels = levels
 
-        self.block1 = ExtractorCNNBlock(out_filters * 2 , 1, levels, unpool=True) # -> OUT = None, out_filters
-        self.block2 = ExtractorCNNBlock(out_filters * 2 , 3, levels, unpool=True)
-        self.block3 = ExtractorCNNBlock(out_filters * 2 , 5, levels, unpool=True)
-        self.block4 = ExtractorCNNBlock(out_filters * 2 , 7, levels, unpool=True)
+        self.conv = Conv2DTranspose(filters, kernel_size, activation='relu', padding='same', strides=2 if upsampling == 'conv' and levels == 1 else 1)
+
+        if upsampling == 'max' and levels > 1:
+            self.upsampling = UpSampling2D()
+        elif upsampling == 'conv' and levels > 1:
+            self.upsampling = Conv2DTranspose(filters, kernel_size, activation='relu', padding='same', strides=2)
+
         self.bn = BatchNormalization()
-        self.flatten = Flatten()
         self.attention = Attention()
+        self.concat = Concatenate()
+        self.postprocessing_conv = Conv2DTranspose(filters, 1, activation='relu')
 
-        self.postprocessing_conv = Conv1D(out_filters, 1, activation='relu')
-
-    def call(self, inputs, flatten=False):
-        block1_enc = self.block1(inputs)
-        block2_enc = self.block2(inputs)
-        block3_enc = self.block3(inputs)
-        block4_enc = self.block4(inputs)
-
-        x = Add()([block1_enc, block2_enc, block3_enc, block4_enc])
+    def call(self, inputs):
+        x = self.conv(inputs)
         x = self.bn(x)
 
-        att = self.attention([x, x])
-        x = Concatenate()([x, att])
+        if self.upsampling and self.levels > 1:
+            x = self.upsampling(x)
 
-        if flatten:
-            x = self.flatten(x)
-        else:
-            x = self.postprocessing_conv(x)
+        att = self.attention([x, x])
+        x = self.concat([x, att])
+
+        x = self.postprocessing_conv(x)
         
         return x
 

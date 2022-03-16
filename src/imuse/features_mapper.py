@@ -20,8 +20,7 @@ class FeaturesMapperBlock(Model):
         self._calculate_mar_loss = MeanAbsoluteError()
 
     def call(self, inputs):
-        z_sample, self.mu, self.log_variance, global_stats = self.encoder(
-            inputs[0], inputs[1], inputs[2])
+        z_sample, self.mu, self.log_variance, global_stats = self.encoder(inputs[0], inputs[1], inputs[2])
         corr, means = self.decoder(z_sample, global_stats)
 
         return corr, means

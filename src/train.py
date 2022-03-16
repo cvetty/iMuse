@@ -72,7 +72,7 @@ def main(config):
     val_spe = 8
     
     feature_mapper = FeaturesMapperBlock(config.block)
-    feature_mapper.compile(tf.keras.optimizers.Adam(5e-5))
+    feature_mapper.compile(tf.keras.optimizers.Adam(8e-5))
     feature_mapper.fit(
         train_ds,
         steps_per_epoch = train_spe,
@@ -90,7 +90,7 @@ def get_callbacks(tensorboard_fq, config, sample_ds):
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
         # EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 20, verbose = 1),
         ModelCheckpoint(
-            filepath = f'../checkpoints/FeaturesMapper{config.block}.{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
+            filepath = f'../checkpoints/block{config.block}/FM.{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
             monitor='loss',
             mode='min',
             save_weights_only=True,

@@ -9,7 +9,6 @@ import pywt
 from PIL import Image
 from skimage.util import img_as_ubyte
 import random
-import sys
 import io
 
 

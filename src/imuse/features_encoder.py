@@ -1,5 +1,5 @@
 from tensorflow.keras import Model, Sequential
-from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, Reshape, Add, Flatten, Dense, Concatenate, MaxPooling1D
+from tensorflow.keras.layers import Input, Conv2D, Reshape, Add, Flatten, Dense, Concatenate, MaxPooling2D
 
 from layers import Sampler, FeatureExtractor
 
@@ -8,64 +8,54 @@ class FeaturesEncoder(Model):
     def __init__(self, block_level=1):
         super().__init__()
         self._name = f'FeaturesEncoder{block_level}'
+
         self.block_level = block_level
-        self.first_layer_size = 2 ** (block_level +
-                                      3 if block_level < 4 else 6)
-        self.latent_dims = self.first_layer_size / 2
+        self.raw_input_shape = (2 ** (5 + self.block_level), 2 ** (1 + self.block_level))
+        self.preprocessing_reshape = Reshape([*self.raw_input_shape, 1])
+        self.first_layer_size = self.raw_input_shape[0] / 2 if block_level < 3 else 64
 
-        self.feature_extractor1 = FeatureExtractor(self.first_layer_size)
+        self.latent_dims = 16 if block_level in [1, 2] else 32
 
-        self.feature_extractor2 = FeatureExtractor(self.first_layer_size * 2, levels=1)
-
-        self.preprocessing_pool = MaxPooling1D()
-
-        self.conv1 = Conv1D(self.first_layer_size * 2**2, 3,
-                            activation='relu', padding='same', dilation_rate=2)
-        self.conv2 = Conv1D(self.first_layer_size * 2**2, 3,
-                            activation='relu', padding='same', strides=2)
-
-        self.bn2 = BatchNormalization()
+        self.preprocessing_conv = Conv2D(self.first_layer_size, 1, activation='relu', padding='same')
+        self.feature_extractor1 = FeatureExtractor(self.first_layer_size, pool='max')
+        self.feature_extractor2 = FeatureExtractor(self.first_layer_size * 2, pool='max')
+        self.feature_extractor3 = FeatureExtractor(self.first_layer_size * 2**2, pool='conv', dilation_rate=2)
+        self.pool = MaxPooling2D(padding='same')
 
         self.add = Add()
+
         self.global_stats_processor = Sequential([
             Input((2**(block_level + 5) + 512,)),
-            Reshape((1, -1)),
-            Conv1D(self.first_layer_size * 2**2, 1,
-                   activation='relu', padding='same'),
-            Conv1D(self.first_layer_size * 2**2, 1,
-                   activation='relu', padding='same'),
-            Conv1D(self.first_layer_size * 2**2, 1,
-                   activation='relu', padding='same'),
+            Dense(self.first_layer_size * 2**2, activation='relu'),
+            Dense(self.first_layer_size * 2**2, activation='relu'),
+            Dense(self.first_layer_size * 2**2, activation='relu'),
         ])
 
-        self.flatten = Flatten()
+        self.global_stats_reshape = Reshape((1, 1, -1))
 
-        if block_level > 2:
-            self.postprocessing_dense = Dense(self.latent_dims // 4, activation='relu')
+        self.flatten = Flatten()
 
         self.sampler = Sampler()
         self.dense_mean = Dense(self.latent_dims)
         self.dense_std = Dense(self.latent_dims)
+
         self.gs_concat = Concatenate()
 
     def call(self, inputs, means_vector, global_stats):
-        x = self.feature_extractor1(inputs)
+        x = self.preprocessing_reshape(inputs)
+        x = self.preprocessing_conv(x)
+        x = self.feature_extractor1(x)
         x = self.feature_extractor2(x)
-
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
+        x = self.feature_extractor3(x)
+        x = self.pool(x)
 
         global_stats = self.gs_concat([means_vector, global_stats])
         global_stats = self.global_stats_processor(global_stats)
+        global_stats_reshaped = self.global_stats_reshape(global_stats)
 
-        x = self.add([x, global_stats])
+        x = self.add([x, global_stats_reshaped])
 
         x = self.flatten(x)
-        
-        ### Dims reduction happens here
-        if self.block_level > 2:
-            x = self.postprocessing_dense(x)
 
         mu = self.dense_mean(x)
         log_variance = self.dense_std(x)

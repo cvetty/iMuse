@@ -13,3 +13,4 @@ DATA_OUTPUT_VAL_DIR = str(BASE_DIR.joinpath('data', 'tfrecords', 'val'))
 
 BATCH_SIZE = 32
 EPOCHS = 7_500
+DROPOUT_RATE = 0.1
