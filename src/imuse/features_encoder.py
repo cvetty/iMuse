@@ -3,29 +3,39 @@ from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, Reshape, 
 
 from layers import Sampler, FeatureExtractor
 
+
 class FeaturesEncoder(Model):
-    def __init__(self, block_level = 1):
+    def __init__(self, block_level=1):
         super().__init__()
         self._name = f'FeaturesEncoder{block_level}'
 
-        self.first_layer_size = 2 ** (block_level + 3 if block_level < 4 else 6)
+        self.first_layer_size = 2 ** (block_level +
+                                      3 if block_level < 4 else 6)
         self.latent_dims = self.first_layer_size / 2
 
         self.feature_extractor1 = FeatureExtractor(self.first_layer_size)
+
         self.feature_extractor2 = FeatureExtractor(self.first_layer_size * 2, levels=1)
+
         self.preprocessing_pool = MaxPooling1D()
 
-        self.conv1 = Conv1D(self.first_layer_size * 2**2, 3, activation='relu', padding='same', dilation_rate=2)
-        self.conv2 = Conv1D(self.first_layer_size * 2**2, 3, activation='relu', padding='same', strides=2)
+        self.conv1 = Conv1D(self.first_layer_size * 2**2, 3,
+                            activation='relu', padding='same', dilation_rate=2)
+        self.conv2 = Conv1D(self.first_layer_size * 2**2, 3,
+                            activation='relu', padding='same', strides=2)
+
         self.bn2 = BatchNormalization()
 
         self.add = Add()
         self.global_stats_processor = Sequential([
             Input((2**(block_level + 5) + 512,)),
             Reshape((1, -1)),
-            Conv1D(self.first_layer_size * 2**2, 1, activation='relu', padding='same'),
-            Conv1D(self.first_layer_size * 2**2, 1, activation='relu', padding='same'),
-            Conv1D(self.first_layer_size * 2**2, 1, activation='relu', padding='same'),
+            Conv1D(self.first_layer_size * 2**2, 1,
+                   activation='relu', padding='same'),
+            Conv1D(self.first_layer_size * 2**2, 1,
+                   activation='relu', padding='same'),
+            Conv1D(self.first_layer_size * 2**2, 1,
+                   activation='relu', padding='same'),
         ])
 
         self.flatten = Flatten()
@@ -48,6 +58,7 @@ class FeaturesEncoder(Model):
         x = self.add([x, global_stats])
 
         x = self.flatten(x)
+
         mu = self.dense_mean(x)
         log_variance = self.dense_std(x)
 

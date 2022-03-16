@@ -3,8 +3,14 @@ import tensorflow as tf
 from tensorflow.nn import conv2d, conv2d_transpose
 from tensorflow.io import read_file
 from tensorflow.image import decode_image
+from tensorflow.keras.callbacks import Callback
 
 import pywt
+from PIL import Image
+from skimage.util import img_as_ubyte
+import random
+import sys
+import io
 
 
 def _conv2d(x, kernel):
@@ -155,14 +161,73 @@ def per_channel_wd(img, level=1, wavelet='haar'):
 
     return tf.stack([r, g, b], axis=2)
 
-# vae loss function -- only the negative log-likelihood part,
-# since we use add_loss for the KL divergence part
-def partial_vae_loss(x_true, model):
-    # x_recons_logits = model.encode_and_decode(x_true)
-    x_recons_logits = model(x_true)
-    # compute cross entropy loss for each dimension of every datapoint
-    raw_cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
-        labels=x_true, logits=x_recons_logits)
-    neg_log_likelihood = tf.math.reduce_sum(raw_cross_entropy, axis=[1, 2, 3])
 
-    return tf.math.reduce_mean(neg_log_likelihood)
+def make_image(tensor):
+    """
+    Convert an numpy representation image to Image protobuf.
+    Copied from https://github.com/lanpa/tensorboard-pytorch/
+    """
+    _, height, width, channel = tensor.shape
+    tensor = tensor[0]
+    tensor_normalized = tensor - tensor.min()
+    tensor_normalized /= tensor_normalized.max()
+    tensor_normalized = img_as_ubyte(tensor_normalized)
+    tensor_squeezed = np.squeeze(tensor_normalized)
+    
+    image = Image.fromarray(tensor_squeezed)
+    output = io.BytesIO()
+
+    image.save(output, format='PNG')
+    image_string = output.getvalue()
+    output.close()
+
+    summary = tf.Summary.Image(
+        height=height,
+        width=width,
+        colorspace=channel,
+        encoded_image_string=image_string,
+    )
+
+    return summary
+
+class TensorBoardImage(Callback):
+    def __init__(self, log_dir, ds):
+        super().__init__()
+        self.log_dir = log_dir
+        self.ds = ds
+
+    def set_model(self, model):
+        self.model = model
+
+    def on_train_end(self, _):
+        self.writer.close()
+
+    def on_epoch_end(self, epoch, logs={}):
+        if epoch % 10:
+            return
+        
+        data = random.choice(self.ds)
+        x = data[0]
+        y = data[1]
+
+        music_corr = x[0][0:1]
+        music_means = x[1][0:1]
+        music_global_stats = x[2][0:1]
+
+        img_corr_real = y[0][0:1]
+        img_corr_pred, _ = self.model([music_corr, music_means, music_global_stats])
+
+        self._write_corr_plot(img_corr_real, 'true', epoch)
+        self._write_corr_plot(img_corr_pred, 'predicted', epoch)
+
+    def _write_corr_plot(self, corr, filename, epoch):
+        corr = tf.squeeze(corr, 0)
+        corr = tf.expand_dims(corr, 2)
+
+        corr = corr + (tf.abs(tf.reduce_min(corr)))
+        corr = corr / tf.reduce_max(corr)
+        corr = tf.cast(corr * 255, tf.uint8)
+
+        tf.keras.utils.save_img(
+            f'{self.log_dir}{epoch}-{filename}.jpg', corr, scale=False
+        )
