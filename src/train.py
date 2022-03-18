@@ -25,11 +25,9 @@ def get_features_description():
     
     for i in range(1, 5):
         description[f'img_block{i}_corr'] = FixedLenFeature([], tf.string)
-        description[f'img_block{i}_orthonormal_vectors'] = FixedLenFeature([], tf.string)
         description[f'img_block{i}_mean'] = FixedLenFeature([], tf.string)
 
         description[f'music_block{i}_corr'] = FixedLenFeature([], tf.string)
-        description[f'music_block{i}_orthonormal_vectors'] = FixedLenFeature([], tf.string)
         description[f'music_block{i}_mean'] = FixedLenFeature([], tf.string)
     
     return description
@@ -39,19 +37,14 @@ features_description = get_features_description()
 def _parse_function(record, block_level = 1):
     parsed_data = parse_single_example(record, features_description)
 
-    corr_shape = [2**(block_level + 5), 2 ** (block_level + 1)]
+    corr_shape = [2**(block_level + 5), 2 ** (3 + block_level)]
     means_shape = [2**(block_level + 5),]
 
     music_global_stats = parse_tensor(parsed_data["music_global_stats"], tf.float16)
     music_global_stats = tf.ensure_shape(music_global_stats, (512,))
 
     img_corr = parse_tensor(parsed_data[f'img_block{block_level}_corr'], tf.float16)
-    img_corr = tf.ensure_shape(img_corr, corr_shape)
-
-    img_vectors = parse_tensor(parsed_data[f'img_block{block_level}_orthonormal_vectors'], tf.float16)
-    img_vectors = tf.ensure_shape(img_vectors, corr_shape[::-1])
-
-    img_corr = tf.matmul(img_corr, img_vectors)
+    img_corr = tf.ensure_shape(img_corr, [corr_shape[0], corr_shape[0]])
 
     img_means = parse_tensor(parsed_data[f'img_block{block_level}_mean'], tf.float16)
     img_means = tf.ensure_shape(img_means, means_shape)

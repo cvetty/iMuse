@@ -6,10 +6,10 @@ from imuse.features_encoder import FeaturesEncoder
 from imuse.features_decoder import FeaturesDecoder
 
 from config import BATCH_SIZE
-
+import sys
 
 class FeaturesMapperBlock(Model):
-    def __init__(self, block_level=1, kl_weight = 1 / 0.5 * BATCH_SIZE):
+    def __init__(self, block_level=1, kl_weight = 1 / BATCH_SIZE):
         super(FeaturesMapperBlock, self).__init__()
         self._name = 'FeaturesMapperBlock'
         self.block_level = block_level

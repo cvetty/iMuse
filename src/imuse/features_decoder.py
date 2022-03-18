@@ -1,36 +1,56 @@
 import tensorflow as tf
 from layers import FeatureExtractorTranspose
-from tensorflow.keras import Model, Sequential
-from tensorflow.keras.layers import Input, Dropout, Conv2D, Reshape, Add, Dense
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Dropout, Conv2D, Reshape, Add, Dense, Conv2DTranspose, UpSampling2D
 
-from config import DROPOUT_RATE
+from config import DROPOUT_RATE, KERNEL_INITIALIZER, REGULARIZER
 import sys
+
 class FeaturesDecoder(Model):
     def __init__(self, block_level = 1):
         super().__init__()
         self._name = f'FeaturesDecoder{block_level}'
         self.block_level = block_level
 
-        self.corr_output_shape = (2 ** (5 + self.block_level), 2 ** (1 + self.block_level), 1)
-        self.first_layer_size = (self.corr_output_shape[0] // 2 if block_level < 3 else 64) * 2**2
-        self.sample_size = (self.corr_output_shape[0] // 4) * (self.corr_output_shape[1] // 4) * self.first_layer_size
-        self.sample_shape = (self.corr_output_shape[0] // 4, self.corr_output_shape[1] // 4, self.first_layer_size)
+        ### e.g. 64*64*1
+        self.corr_output_size = 2 ** (5 + self.block_level)
+
+        ### e.g. 64*64*1
+        self.first_layer_size = self.corr_output_size // 4
+
+        self.sample_shape = (self.corr_output_size // 8, self.corr_output_size // 8, self.first_layer_size * 2)
+        self.sample_size = (self.sample_shape[0]**2 * self.sample_shape[-1])
+
+        self.latent_dims = self.corr_output_size // 16
 
         ### Means Network
-        self.sample_means = Dense(self.first_layer_size, activation='relu')
+        self.sample_means = Dense(
+            self.first_layer_size * 2**2,
+            activation='relu',
+            kernel_initializer=KERNEL_INITIALIZER,
+        )
         self.means_gs_add = Add()
         self.means_dropout = Dropout(DROPOUT_RATE)
-        self.means_dense = Dense(self.first_layer_size, activation='relu')
-        self.means_out = Dense(self.corr_output_shape[0])
+        self.means_dense = Dense(
+            self.first_layer_size * 2**2,
+            activation='relu',
+            kernel_initializer=KERNEL_INITIALIZER,
+            kernel_regularizer=REGULARIZER
+        )
+
+        self.means_out = Dense(self.corr_output_size)
 
         ### Main Network Sampling
-        self.sample_corr = Dense(self.sample_size, activation='relu')
+        self.preprocessing_higher_dims = Dense(self.latent_dims // 2, activation='relu', kernel_initializer=KERNEL_INITIALIZER)
+        self.sample_corr = Dense(self.sample_size, activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         self.sample_reshape = Reshape(self.sample_shape)
+        self.corr_fe1 = FeatureExtractorTranspose(self.first_layer_size * 2**2, upsampling='conv', levels=1)
+        self.corr_gs_reshape = Reshape((1, 1, -1))
         self.corr_gs_add = Add()
-
-        ### Correlation Matrix Network + Vectors (PCA Transformed)
-        self.correlations_net = self._get_decoder_cnn_net('corr')
-        self.vectors_net = self._get_decoder_cnn_net('vec')
+        self.corr_fe2 = FeatureExtractorTranspose(self.first_layer_size * 2, upsampling='conv', levels=1)
+        self.corr_fe3 = FeatureExtractorTranspose(self.first_layer_size, upsampling='conv', levels=1)
+        self.corr_out = Conv2D(1, 1)
+        self.corr_out_reshape = Reshape((self.corr_output_size, self.corr_output_size))
 
     def call(self, inputs, global_stats):
         ### Means Generation
@@ -41,30 +61,17 @@ class FeaturesDecoder(Model):
         corr_means = self.means_out(corr_means)
 
         ### Main Network
+        inputs = self.preprocessing_higher_dims(inputs)
         corr_sample = self.sample_corr(inputs)
         corr_sample = self.sample_reshape(corr_sample)
-        corr_sample = self.corr_gs_add([corr_sample, global_stats])
 
-        corr_values = self.correlations_net(corr_sample)
-        corr_vectors = self.vectors_net(corr_sample)
+        corr_sample = self.corr_fe1(corr_sample)
+        corr_gs_reshaped = self.corr_gs_reshape(global_stats)
+        corr_sample = self.corr_gs_add([corr_sample, corr_gs_reshaped])
 
-        corr = tf.matmul(corr_values, corr_vectors)
+        corr = self.corr_fe2(corr_sample)
+        corr = self.corr_fe3(corr)
+        corr = self.corr_out(corr)
+        corr = self.corr_out_reshape(corr)
 
         return corr, corr_means
-
-    def _get_decoder_cnn_net(self, out):
-        in_shape = self.sample_shape if out == 'corr' else [self.sample_shape[1], self.sample_shape[0], self.sample_shape[2]]
-        out_shape = self.corr_output_shape if out == 'corr' else [self.corr_output_shape[1], self.corr_output_shape[0], self.corr_output_shape[2]]
-        
-        return Sequential(
-            [
-                Input(self.sample_shape),
-                Reshape(in_shape),
-
-                FeatureExtractorTranspose(self.first_layer_size // 2, upsampling='conv'),
-                FeatureExtractorTranspose(self.first_layer_size // 2**2, upsampling='conv', levels=1),
-
-                Conv2D(1, 1),
-                Reshape(out_shape[:2]),
-            ]
-        )

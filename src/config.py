@@ -1,5 +1,6 @@
 from pathlib import Path
-
+from tensorflow.keras.initializers import HeNormal
+from tensorflow.keras.regularizers import l2
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,3 +15,6 @@ DATA_OUTPUT_VAL_DIR = str(BASE_DIR.joinpath('data', 'tfrecords', 'val'))
 BATCH_SIZE = 32
 EPOCHS = 7_500
 DROPOUT_RATE = 0.1
+
+KERNEL_INITIALIZER = HeNormal()
+REGULARIZER = l2(l=0.005)

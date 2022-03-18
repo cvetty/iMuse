@@ -1,10 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Layer, ReLU, MaxPool2D, Conv2D, Conv2DTranspose, BatchNormalization, Attention, Concatenate, UpSampling2D
+from tensorflow.keras.layers import Layer, ReLU, Dropout, MaxPool2D, Conv2D, Conv2DTranspose, BatchNormalization, Attention, Concatenate, UpSampling2D
 
 from utils import _conv2d, _conv2d_transpose
 
-from config import DROPOUT_RATE
+from config import DROPOUT_RATE, KERNEL_INITIALIZER, REGULARIZER
 
 
 ### Wavelet AE ###
@@ -160,22 +160,44 @@ class CNNBlock(Layer):
 
 
 class FeatureExtractor(Model):
-    def __init__(self, filters, kernel_size = 3, pool = None, levels=2, dilation_rate = 1):
+    def __init__(self, filters, kernel_size = 3, pool = None, levels=2, dilation_rate = 1, kernel_size_2 = None):
         super().__init__()
         self.pool = None
         self.levels = levels
 
-        self.conv = Conv2D(filters, kernel_size, activation='relu', padding='same', strides=2 if pool == 'conv' and levels == 1 else 1, dilation_rate=dilation_rate)
+        self.conv = Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            padding='same',
+            strides=2 if pool == 'conv' and levels == 1 else 1,
+            dilation_rate=dilation_rate,
+            kernel_initializer=KERNEL_INITIALIZER,
+        )
 
         if pool == 'max' and self.levels > 1:
             self.pool = MaxPool2D()
         elif pool == 'conv' and self.levels > 1:
-            self.pool = Conv2D(filters, kernel_size, activation='relu', padding='same', strides=2)
+            self.pool = Conv2D(
+                filters,
+                kernel_size_2 if kernel_size_2 else kernel_size,
+                activation='relu',
+                padding='same',
+                strides=2,
+                kernel_initializer=KERNEL_INITIALIZER,
+            )
 
         self.bn = BatchNormalization()
         self.attention = Attention()
         self.concat = Concatenate()
-        self.postprocessing_conv = Conv2D(filters, 1, activation='relu')
+        self.dropout = Dropout(DROPOUT_RATE)
+        self.postprocessing_conv = Conv2D(
+            filters,
+            1,
+            activation='relu',
+            kernel_initializer=KERNEL_INITIALIZER,
+            kernel_regularizer=REGULARIZER,
+        )
 
     def call(self, inputs):
         x = self.conv(inputs)
@@ -186,29 +208,43 @@ class FeatureExtractor(Model):
 
         att = self.attention([x, x])
         x = self.concat([x, att])
-
+        x = self.dropout(x)
         x = self.postprocessing_conv(x)
         
         return x
 
 
 class FeatureExtractorTranspose(Model):
-    def __init__(self, filters, kernel_size = 3, upsampling = None, levels = 2):
+    def __init__(self, filters, kernel_size = 3, upsampling = None, levels = 2, kernel_size_2=None):
         super().__init__()
         self.upsampling = None
         self.levels = levels
 
-        self.conv = Conv2DTranspose(filters, kernel_size, activation='relu', padding='same', strides=2 if upsampling == 'conv' and levels == 1 else 1)
+        self.conv = Conv2DTranspose(
+            filters,
+            kernel_size,
+            activation='relu',
+            padding='same',
+            strides=2 if upsampling == 'conv' and levels == 1 else 1,
+            kernel_initializer=KERNEL_INITIALIZER,
+        )
 
         if upsampling == 'max' and levels > 1:
             self.upsampling = UpSampling2D()
         elif upsampling == 'conv' and levels > 1:
-            self.upsampling = Conv2DTranspose(filters, kernel_size, activation='relu', padding='same', strides=2)
+            self.upsampling = Conv2DTranspose(filters, kernel_size_2 if kernel_size_2 else kernel_size, activation='relu', padding='same', strides=2)
 
         self.bn = BatchNormalization()
         self.attention = Attention()
         self.concat = Concatenate()
-        self.postprocessing_conv = Conv2DTranspose(filters, 1, activation='relu')
+        self.dropout = Dropout(DROPOUT_RATE)
+        self.postprocessing_conv = Conv2DTranspose(
+            filters,
+            1,
+            activation='relu',
+            kernel_initializer=KERNEL_INITIALIZER,
+            kernel_regularizer=REGULARIZER,
+        )
 
     def call(self, inputs):
         x = self.conv(inputs)
@@ -219,7 +255,7 @@ class FeatureExtractorTranspose(Model):
 
         att = self.attention([x, x])
         x = self.concat([x, att])
-
+        x = self.dropout(x)
         x = self.postprocessing_conv(x)
         
         return x
