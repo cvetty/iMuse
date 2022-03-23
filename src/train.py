@@ -81,10 +81,10 @@ def get_callbacks(tensorboard_fq, config, sample_ds):
 
     return [
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
-        EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 35, verbose = 1),
+        EarlyStopping(monitor = 'overall_loss', min_delta = 1e-3, patience = 125, verbose = 1),
         ModelCheckpoint(
             filepath = f'../checkpoints/block{config.block}/FM.{{epoch:03d}}-{{corr_loss:.4f}}-{{val_corr_loss:.4f}}-{{means_loss:.4f}}-{{val_means_loss:.4f}}.h5',
-            monitor='loss',
+            monitor='overall_loss',
             mode='min',
             save_weights_only=True,
             save_best_only= True,

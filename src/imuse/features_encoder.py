@@ -25,7 +25,7 @@ class FeaturesEncoder(Model):
         self.dropout2 = Dropout(DROPOUT_RATE)
 
         self.dense3_1 = Dense(self.raw_input_shape // 4, activation='relu', kernel_initializer=KERNEL_INITIALIZER)
-        self.dense3_2 = Dense(self.raw_input_shape // 4, activation='relu', kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=REGULARIZER)
+        self.dense3_2 = Dense(self.raw_input_shape // 4, activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         self.bn3 = BatchNormalization()
         self.dropout3 = Dropout(DROPOUT_RATE)
 

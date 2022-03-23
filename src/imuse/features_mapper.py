@@ -37,16 +37,16 @@ class FeaturesMapperBlock(Model):
         x, y = data
 
         with tf.GradientTape() as tape:
-            corr_pred, _ = self.call(x, training = True)
-            corr_loss = self._calculate_mar_loss(y[0], corr_pred)
-            kl_loss = self._calculate_kl_loss()
-            loss = self.kl_weight * kl_loss + corr_loss
-
             ### MAIN
-            training_vars = self.trainable_variables
-            gradients = tape.gradient(loss, training_vars)
+            corr_pred, _ = self.call(x, training = True)
+            corr_mse_loss = self._calculate_mar_loss(y[0], corr_pred)
+            kl_loss = self._calculate_kl_loss()
+            corr_loss = self.kl_weight * kl_loss + corr_mse_loss
 
-            self.optimizer.apply_gradients(zip(gradients, training_vars))
+            corr_training_vars = self.trainable_variables
+            corr_gradients = tape.gradient(corr_loss, corr_training_vars)
+
+            self.optimizer.apply_gradients(zip(corr_gradients, corr_training_vars))
 
         with tf.GradientTape() as tape:
             ### MEANS
@@ -57,32 +57,37 @@ class FeaturesMapperBlock(Model):
 
             self.optimizer.apply_gradients(zip(means_gradients, means_training_vars))
 
+        overall_loss = tf.abs(corr_loss) + tf.abs(means_loss)
+
         return {
             'kl_loss': kl_loss,
-            'corr_mse': corr_loss,
-            'corr_loss': loss,
+            'corr_mse': corr_mse_loss,
+
+            'corr_loss': corr_loss,
             'means_loss': means_loss,
-            'loss': corr_loss + means_loss,
+            'overall_loss': overall_loss
         }
 
     def test_step(self, data):
         x, y = data
 
         corr_pred, means_pred = self.call(x)
-        corr_loss = self._calculate_mar_loss(y[0], corr_pred)
+        corr_mse_loss = self._calculate_mar_loss(y[0], corr_pred)
         kl_loss = self._calculate_kl_loss()
+        corr_loss = self.kl_weight * kl_loss + corr_mse_loss
 
         means_pred = self.means_mapper(x[1], x[2])
         means_loss = self._calculate_mar_loss(y[1], means_pred)
+        overall_loss = tf.abs(corr_loss) + tf.abs(means_loss)
 
-        loss = self.kl_weight * kl_loss + corr_loss
 
         return {
             'kl_loss': kl_loss,
-            'corr_msr': corr_loss,
-            'corr_loss': loss,
+            'corr_mse': corr_mse_loss,
+            'corr_loss': corr_loss,
+
             'means_loss': means_loss,
-            'loss': corr_loss + means_loss,
+            'overall_loss': overall_loss
         }
 
 
