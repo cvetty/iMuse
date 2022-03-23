@@ -11,19 +11,18 @@ class MeansMapper(Model):
         self.block_level = block_level
 
         self.means_dense1 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER)
-        self.means_dense2 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=REGULARIZER)
+        self.means_dense2 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         self.dropout2 = Dropout(DROPOUT_RATE)
 
-        self.means_dense3 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER)
+        self.means_dense3 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER,  kernel_regularizer=REGULARIZER)
         self.dropout2 = Dropout(DROPOUT_RATE)
-        self.means_dense4 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=REGULARIZER)
+        self.means_dense4 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         
         self.means_out = Dense(2**(5+block_level))
 
-
         self.gs_dense1 = Dense(512, activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         self.gs_dropout1 = Dropout(DROPOUT_RATE)
-        self.gs_dense2 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=REGULARIZER)
+        self.gs_dense2 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         self.gs_add = Add()
 
     def call(self, inputs, gs):

@@ -12,7 +12,7 @@ import sys
 class FeaturesMapperBlock(Model):
     def __init__(self, block_level=1, kl_weight = 1 / BATCH_SIZE):
         super(FeaturesMapperBlock, self).__init__()
-        self._name = 'FeaturesMapperBlock'
+        self._name = f'FeaturesMapper{block_level}'
         self.block_level = block_level
 
         self.encoder = FeaturesEncoder(self.block_level)
@@ -22,18 +22,23 @@ class FeaturesMapperBlock(Model):
 
         self.means_mapper = MeansMapper(block_level)
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         z_sample, self.mu, self.log_variance = self.encoder(inputs[0], inputs[1], inputs[2])
         corr = self.decoder(z_sample)
 
-        return corr
+        if not training:
+            means = self.means_mapper(inputs[1], inputs[2])
+        else:
+            means = None
+
+        return corr, means
 
     def train_step(self, data):
         x, y = data
 
         with tf.GradientTape() as tape:
-            y_pred = self.call(x)
-            corr_loss = self._calculate_mar_loss(y[0], y_pred)
+            corr_pred, _ = self.call(x, training = True)
+            corr_loss = self._calculate_mar_loss(y[0], corr_pred)
             kl_loss = self._calculate_kl_loss()
             loss = self.kl_weight * kl_loss + corr_loss
 
@@ -63,8 +68,8 @@ class FeaturesMapperBlock(Model):
     def test_step(self, data):
         x, y = data
 
-        y_pred = self.call(x)
-        corr_loss = self._calculate_mar_loss(y[0], y_pred)
+        corr_pred, means_pred = self.call(x)
+        corr_loss = self._calculate_mar_loss(y[0], corr_pred)
         kl_loss = self._calculate_kl_loss()
 
         means_pred = self.means_mapper(x[1], x[2])

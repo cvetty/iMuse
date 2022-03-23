@@ -60,38 +60,22 @@ def _parse_function(record, block_level = 1):
 
 def main(config):
     train_ds, test_ds, val_ds = preprocess_dataset(config.block)
-    train_spe = 109
-    test_spe = 12
-    val_spe = 8
     
+    print(f'BLOCK: {config.block}')
     feature_mapper = FeaturesMapperBlock(config.block)
+    feature_mapper.build([(1, 2**(5+config.block1)), (1, 2**(5+config.block1)), (1, 512)])
     feature_mapper.compile(tf.keras.optimizers.Adam(1e-4))
-    feature_mapper.fit(
-        train_ds,
-        steps_per_epoch = train_spe,
-        validation_data = val_ds,
-        validation_steps = val_spe,
-        epochs=config.epochs,
-        callbacks=get_callbacks(train_spe / 5, config, test_ds.take(8))
-    )
+    feature_mapper.load_weights(f'../checkpoints/block{config.block}/FM.007-0.3820-0.3379-1.5898-2.3702.h5')
 
-def get_callbacks(tensorboard_fq, config, sample_ds):
-    log_dir = "../logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-    sample_ds = list(sample_ds.as_numpy_iterator())
+    print('Train Evaluation:')
+    feature_mapper.evaluate(train_ds)
 
-    return [
-        TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
-        EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 35, verbose = 1),
-        ModelCheckpoint(
-            filepath = f'../checkpoints/block{config.block}/FM.{{epoch:03d}}-{{corr_loss:.4f}}-{{val_corr_loss:.4f}}-{{means_loss:.4f}}-{{val_means_loss:.4f}}.h5',
-            monitor='loss',
-            mode='min',
-            save_weights_only=True,
-            save_best_only= True,
-            verbose = 1
-        ),
-        TensorBoardImage(f'../examples/block{config.block}/', sample_ds)
-    ]
+    print('Val Evaluation:')
+    feature_mapper.evaluate(val_ds)
+
+    print('Test Evaluation:')
+    feature_mapper.evaluate(test_ds)
+
 
 def preprocess_dataset(block_level = 1):
     # Global shuffle on all files
@@ -103,7 +87,6 @@ def preprocess_dataset(block_level = 1):
     train_ds = train_ds.batch(BATCH_SIZE)
 
     train_ds = train_ds.apply(tf.data.experimental.ignore_errors())
-    train_ds = train_ds.repeat()
     train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
 
     test_ds = tf.data.TFRecordDataset(str(TEST_DIR), compression_type="GZIP")

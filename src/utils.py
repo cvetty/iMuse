@@ -218,7 +218,7 @@ class TensorBoardImage(Callback):
         music_global_stats = x[2][0:1]
 
         img_corr_real = y[0][0:1]
-        img_corr_pred = self.model([music_corr, music_means, music_global_stats])
+        img_corr_pred, _ = self.model([music_corr, music_means, music_global_stats])
 
         self._write_corr_plot(img_corr_real, 'true', epoch)
         self._write_corr_plot(img_corr_pred, 'predicted', epoch)
