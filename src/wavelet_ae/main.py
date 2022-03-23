@@ -14,7 +14,7 @@ class WaveletAE(Model):
         
         self.encoder = WaveletEncoder()
         self.decoder = WaveletDecoder()
-        self.load_weights(WAVELET_AE_WEIGHTS_PATH)
+        self.load_weights(WAVELET_AE_WEIGHTS_PATH).expect_partial()
 
     def call(self, inputs, trainable=False):
         x, skips, _ = self.encoder(inputs)
@@ -51,7 +51,7 @@ class WaveletAE(Model):
 
         return features, skips
 
-    def get_style_correlations(self, inputs, blocks=['block1', 'block2', 'block3', 'block4'], ede=True, normalize=True):
+    def get_style_correlations(self, inputs, blocks=['block1', 'block2', 'block3', 'block4'], ede=True, normalize='standard'):
         _, _, encoder_feat = self.encoder(inputs)
         correlations = []
         means = []

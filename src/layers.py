@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Layer, ReLU, Dropout, MaxPool2D, Conv2D, Conv2DTranspose, BatchNormalization, Attention, Concatenate, UpSampling2D
+from tensorflow.keras.layers import Layer, ReLU, Dropout, MaxPool1D, Conv2D, Conv1D, Conv1DTranspose, BatchNormalization, Attention, Concatenate, UpSampling1D
 
 from utils import _conv2d, _conv2d_transpose
 
@@ -165,7 +165,7 @@ class FeatureExtractor(Model):
         self.pool = None
         self.levels = levels
 
-        self.conv = Conv2D(
+        self.conv = Conv1D(
             filters,
             kernel_size,
             activation='relu',
@@ -176,9 +176,9 @@ class FeatureExtractor(Model):
         )
 
         if pool == 'max' and self.levels > 1:
-            self.pool = MaxPool2D()
+            self.pool = MaxPool1D()
         elif pool == 'conv' and self.levels > 1:
-            self.pool = Conv2D(
+            self.pool = Conv1D(
                 filters,
                 kernel_size_2 if kernel_size_2 else kernel_size,
                 activation='relu',
@@ -188,10 +188,10 @@ class FeatureExtractor(Model):
             )
 
         self.bn = BatchNormalization()
-        self.attention = Attention()
+        self.attention = Attention(use_scale=True)
         self.concat = Concatenate()
         self.dropout = Dropout(DROPOUT_RATE)
-        self.postprocessing_conv = Conv2D(
+        self.postprocessing_conv = Conv1D(
             filters,
             1,
             activation='relu',
@@ -220,7 +220,7 @@ class FeatureExtractorTranspose(Model):
         self.upsampling = None
         self.levels = levels
 
-        self.conv = Conv2DTranspose(
+        self.conv = Conv1DTranspose(
             filters,
             kernel_size,
             activation='relu',
@@ -230,15 +230,15 @@ class FeatureExtractorTranspose(Model):
         )
 
         if upsampling == 'max' and levels > 1:
-            self.upsampling = UpSampling2D()
+            self.upsampling = UpSampling1D()
         elif upsampling == 'conv' and levels > 1:
-            self.upsampling = Conv2DTranspose(filters, kernel_size_2 if kernel_size_2 else kernel_size, activation='relu', padding='same', strides=2)
+            self.upsampling = Conv1DTranspose(filters, kernel_size_2 if kernel_size_2 else kernel_size, activation='relu', padding='same', strides=2)
 
         self.bn = BatchNormalization()
         self.attention = Attention()
         self.concat = Concatenate()
         self.dropout = Dropout(DROPOUT_RATE)
-        self.postprocessing_conv = Conv2DTranspose(
+        self.preprocessing = Conv1DTranspose(
             filters,
             1,
             activation='relu',
@@ -247,17 +247,16 @@ class FeatureExtractorTranspose(Model):
         )
 
     def call(self, inputs):
+        att = self.attention([inputs, inputs])
+        x = self.concat([inputs, att])
+        x = self.preprocessing(x)
+
         x = self.conv(inputs)
         x = self.bn(x)
 
         if self.upsampling and self.levels > 1:
             x = self.upsampling(x)
 
-        att = self.attention([x, x])
-        x = self.concat([x, att])
-        x = self.dropout(x)
-        x = self.postprocessing_conv(x)
-        
         return x
 
 class Sampler(Layer):

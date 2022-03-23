@@ -15,13 +15,12 @@ from vggish_preprocessing.preprocess_sound import preprocess_sound
 import sys
 
 class DatasetGenerator:
-    def __init__(self, max_dim_size=128, vgg_input_max_size=512, pca_compressing_coeff=4):
+    def __init__(self, max_dim_size=128, vgg_input_max_size=512, pca=None):
         self.max_dim_size = max_dim_size
         self.vgg_input_max_size = vgg_input_max_size
         self.wavelet_ae = WaveletAE()
         self.vggish = VGGish()
-        self.pca = PCA()
-        self.pca_compressing_coeff = pca_compressing_coeff
+        self.pca = pca
 
     def process_image(self, img_path):
         self.img_path = img_path
@@ -39,11 +38,19 @@ class DatasetGenerator:
 #         self.img_resized = tf.image.resize_with_crop_or_pad(self.img_resized, self.max_dim_size, self.max_dim_size)
 
         self.style_corr, self.style_means = self.wavelet_ae.get_style_correlations(
-            tf.expand_dims(self.img_raw, 0), ede=False)
+            tf.expand_dims(self.img_raw, 0),
+            normalize='standard',
+            ede=False
+        )
+
+        if self.pca:
+            self.style_corr_pca = []
 
         for i in range(len(self.style_corr)):
             self.style_corr[i] = tf.squeeze(self.style_corr[i], 0)
             self.style_corr[i] = tf.cast(self.style_corr[i], tf.float16)
+            if self.pca:
+                self.style_corr_pca.append(self._get_pca(self.pca[i][1], self.style_corr[i]))
 
         for i in range(len(self.style_means)):
             self.style_means[i] = tf.squeeze(self.style_means[i], 0)
@@ -57,31 +64,30 @@ class DatasetGenerator:
         audio_data = audio_data[random_start: random_start + train_len]
 
         self.spec = preprocess_sound(audio_data, sr)
-
-        self.vggish_feat_corr, self.vggish_feat_means, self.vggish_global_stats = self.vggish.get_style_correlations(tf.expand_dims(self.spec, 3), ede=False)
+        self.vggish_feat_corr, self.vggish_feat_means, self.vggish_global_stats = self.vggish.get_style_correlations(
+            tf.expand_dims(self.spec, 3),
+            normalize='min-max',
+            ede=False
+        )
         self.vggish_global_stats = tf.squeeze(self.vggish_global_stats, 0)
         self.vggish_global_stats = tf.cast(self.vggish_global_stats, tf.float16)
 
         for i in range(len(self.vggish_feat_corr)):
             self.vggish_feat_corr[i] = tf.squeeze(self.vggish_feat_corr[i], 0)
             self.vggish_feat_corr[i] = tf.cast(self.vggish_feat_corr[i], tf.float16)
-            self.vggish_feat_corr[i] = self.get_corr_pca(
-                self.vggish_feat_corr[i], self.vggish_feat_corr[i].shape[1] // self.pca_compressing_coeff)
-
+            if self.pca:
+                self.vggish_feat_corr[i] = self._get_pca(self.pca[i][0], self.vggish_feat_corr[i])
 
         for i in range(len(self.vggish_feat_means)):
             self.vggish_feat_means[i] = tf.squeeze(self.vggish_feat_means[i], 0)
             self.vggish_feat_means[i] = tf.cast(self.vggish_feat_means[i], tf.float16)
 
-    def get_corr_pca(self, corr, n_components):
-        feat = self.pca.fit_transform(corr.numpy())
-        orthonormal_vectors = self.pca.components_
+    def _get_pca(self, pca, feat):
+        feat = tf.reshape(feat, (1,-1))
+        feat = pca.transform(feat.numpy())
+        feat = tf.convert_to_tensor(feat, tf.float16)
 
-        feat = tf.convert_to_tensor(feat, dtype=tf.float16)
-        orthonormal_vectors = tf.convert_to_tensor(
-            orthonormal_vectors, dtype=tf.float16)
-
-        return feat[:, :n_components], orthonormal_vectors[:n_components, :]
+        return feat
 
     def process(self, music, img):
         self.process_image(img)
@@ -100,11 +106,16 @@ class DatasetGenerator:
             features[f'img_block{i}_mean'] = _bytes_feature(
                 serialize_tensor(self.style_means[i-1]))
 
+            if self.pca:
+                features[f'img_block{i}_corr_pca'] = _bytes_feature(
+                    serialize_tensor(self.style_corr_pca[i-1]))
+
             features[f'music_block{i}_corr'] = _bytes_feature(
-                serialize_tensor(self.vggish_feat_corr[i-1][0]))
+                serialize_tensor(self.vggish_feat_corr[i-1]))
             features[f'music_block{i}_mean'] = _bytes_feature(
                 serialize_tensor(self.vggish_feat_means[i-1]))
 
         return Example(
             features=Features(feature=features)
         ).SerializeToString()
+t = DatasetGenerator()

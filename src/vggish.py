@@ -30,7 +30,7 @@ class VGGish(Model):
         self.conv2d_4_2 = Conv2D(512, (3, 3), strides=(1, 1), activation='relu', padding='same', name='conv4/conv4_2')
         self.pool_4 = MaxPooling2D((2, 2), strides=(2, 2), padding='same', name='pool4')
         
-        self.load_weights(VGGISH_WEIGHTS_PATH)
+        self.load_weights(VGGISH_WEIGHTS_PATH).expect_partial()
 
         self.global_pool = GlobalAveragePooling2D()
 

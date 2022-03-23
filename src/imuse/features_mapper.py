@@ -1,6 +1,7 @@
 import tensorflow as tf
+from imuse.means_mapper import MeansMapper
 from tensorflow.keras import Model
-from tensorflow.keras.losses import MeanAbsoluteError
+from tensorflow.keras.losses import MeanSquaredError
 
 from imuse.features_encoder import FeaturesEncoder
 from imuse.features_decoder import FeaturesDecoder
@@ -17,67 +18,68 @@ class FeaturesMapperBlock(Model):
         self.encoder = FeaturesEncoder(self.block_level)
         self.decoder = FeaturesDecoder(self.block_level)
         self.kl_weight = kl_weight
-        self._calculate_mar_loss = MeanAbsoluteError()
+        self._calculate_mar_loss = MeanSquaredError()
+
+        self.means_mapper = MeansMapper(block_level)
 
     def call(self, inputs):
-        z_sample, self.mu, self.log_variance, global_stats = self.encoder(inputs[0], inputs[1], inputs[2])
-        corr, means = self.decoder(z_sample, global_stats)
+        z_sample, self.mu, self.log_variance = self.encoder(inputs[0], inputs[1], inputs[2])
+        corr = self.decoder(z_sample)
 
-        return corr, means
+        return corr
 
     def train_step(self, data):
         x, y = data
 
         with tf.GradientTape() as tape:
             y_pred = self.call(x)
-            reconstruction_loss, corr_loss, means_loss = self._calculate_reconstruction_loss(y, y_pred)
+            corr_loss = self._calculate_mar_loss(y[0], y_pred)
             kl_loss = self._calculate_kl_loss()
-            loss = self.kl_weight * kl_loss + reconstruction_loss
+            loss = self.kl_weight * kl_loss + corr_loss
 
-        training_vars = self.trainable_variables
-        gradients = tape.gradient(loss, training_vars)
+            ### MAIN
+            training_vars = self.trainable_variables
+            gradients = tape.gradient(loss, training_vars)
 
-        self.optimizer.apply_gradients(zip(gradients, training_vars))
+            self.optimizer.apply_gradients(zip(gradients, training_vars))
+
+        with tf.GradientTape() as tape:
+            ### MEANS
+            means_pred = self.means_mapper(x[1], x[2])
+            means_loss = self._calculate_mar_loss(y[1], means_pred)
+            means_training_vars = self.means_mapper.trainable_variables
+            means_gradients = tape.gradient(means_loss, means_training_vars)
+
+            self.optimizer.apply_gradients(zip(means_gradients, means_training_vars))
 
         return {
             'kl_loss': kl_loss,
-            'mar': reconstruction_loss,
-            'loss': loss,
-            'corr': corr_loss,
-            'means': means_loss,
+            'corr_mse': corr_loss,
+            'corr_loss': loss,
+            'means_loss': means_loss,
+            'loss': corr_loss + means_loss,
         }
 
     def test_step(self, data):
         x, y = data
 
         y_pred = self.call(x)
-        reconstruction_loss, corr_loss, means_loss = self._calculate_reconstruction_loss(y, y_pred)
+        corr_loss = self._calculate_mar_loss(y[0], y_pred)
         kl_loss = self._calculate_kl_loss()
-        loss = self.kl_weight * kl_loss + reconstruction_loss
+
+        means_pred = self.means_mapper(x[1], x[2])
+        means_loss = self._calculate_mar_loss(y[1], means_pred)
+
+        loss = self.kl_weight * kl_loss + corr_loss
 
         return {
             'kl_loss': kl_loss,
-            'mar': reconstruction_loss,
-            'loss': loss,
-            'corr': corr_loss,
-            'means': means_loss,
+            'corr_msr': corr_loss,
+            'corr_loss': loss,
+            'means_loss': means_loss,
+            'loss': corr_loss + means_loss,
         }
 
-    def _calculate_combined_loss(self, y_target, y_predicted):
-        reconstruction_loss = self._calculate_reconstruction_loss(
-            y_target, y_predicted)
-
-        kl_loss = self._calculate_kl_loss()
-        combined_loss = self.kl_weight * kl_loss + reconstruction_loss
-
-        return combined_loss
-
-    def _calculate_reconstruction_loss(self, y_target, y_predicted):
-        corr_loss = self._calculate_mar_loss(y_target[0], y_predicted[0])
-        means_loss = self._calculate_mar_loss(y_target[1], y_predicted[1])
-        reconstruction_loss = 0.5 * (corr_loss + means_loss)
-
-        return reconstruction_loss, corr_loss, means_loss
 
     def _calculate_kl_loss(self):
         kl_loss = -0.5 * tf.math.reduce_sum(1 + self.log_variance - tf.square(

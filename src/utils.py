@@ -75,7 +75,7 @@ def get_svd(feat):
     return tf.linalg.svd(feat)
 
 
-def get_style_correlation_transform(feat, return_mean=False, normalize=False):
+def get_style_correlation_transform(feat, return_mean=False, normalize=None):
     feat, mean = preprocess_feat(feat)
     s_e, _, s_v = get_svd(feat)
     # The inverse of the content singular values matrix operation (^-0.5)
@@ -83,9 +83,13 @@ def get_style_correlation_transform(feat, return_mean=False, normalize=False):
 
     EDE = tf.matmul(tf.matmul(s_v, tf.linalg.diag(s_e)), s_v, transpose_b=True)
 
-    if normalize:
-        EDE -= tf.reduce_mean(feat, 0)
+    if normalize == 'standard':
+        EDE -= tf.reduce_mean(EDE)
         EDE /= tf.math.reduce_std(EDE)
+    elif normalize == 'min-max':
+        EDE -= tf.reduce_min(EDE)
+        EDE /= tf.reduce_max(EDE) - tf.reduce_min(EDE)
+
 
     return (EDE, mean) if return_mean else EDE
 
@@ -140,14 +144,17 @@ def normalized_wt_downsampling(x, wavelet, level):
 
     return LL
 
-
-def get_correlations(feature_map, normalize=True):
+import sys
+def get_correlations(feature_map, normalize='standard'):
     feat, _ = preprocess_feat(feature_map, center=True)
     feat = tf.matmul(feat, feat, transpose_b=True) / (feat.shape[1] - 1)
 
-    if normalize:
-        feat -= tf.reduce_mean(feat, 0)
+    if normalize == 'standard':
+        feat -= tf.reduce_mean(feat)
         feat /= tf.math.reduce_std(feat)
+    elif normalize == 'min-max':
+        feat -= tf.reduce_min(feat)
+        feat /= tf.reduce_max(feat) - tf.reduce_min(feat)
 
     return feat
 
@@ -198,9 +205,6 @@ class TensorBoardImage(Callback):
     def set_model(self, model):
         self.model = model
 
-    def on_train_end(self, _):
-        self.writer.close()
-
     def on_epoch_end(self, epoch, logs={}):
         if epoch % 10:
             return
@@ -214,7 +218,7 @@ class TensorBoardImage(Callback):
         music_global_stats = x[2][0:1]
 
         img_corr_real = y[0][0:1]
-        img_corr_pred, _ = self.model([music_corr, music_means, music_global_stats])
+        img_corr_pred = self.model([music_corr, music_means, music_global_stats])
 
         self._write_corr_plot(img_corr_real, 'true', epoch)
         self._write_corr_plot(img_corr_pred, 'predicted', epoch)

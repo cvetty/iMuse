@@ -9,11 +9,11 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-from config import BATCH_SIZE, EPOCHS, DATA_OUTPUT_TRAIN_DIR, DATA_OUTPUT_TEST_DIR, DATA_OUTPUT_VAL_DIR
+from config import BATCH_SIZE, EPOCHS, DATA_OUTPUT_PCA_TRAIN_DIR, DATA_OUTPUT_PCA_TEST_DIR, DATA_OUTPUT_PCA_VAL_DIR
 
-TRAIN_DIR = Path(DATA_OUTPUT_TRAIN_DIR)
-VAL_DIR = Path(DATA_OUTPUT_VAL_DIR) / "0.tfrecord"
-TEST_DIR = Path(DATA_OUTPUT_TEST_DIR) / "0.tfrecord"
+TRAIN_DIR = Path(DATA_OUTPUT_PCA_TRAIN_DIR)
+VAL_DIR = Path(DATA_OUTPUT_PCA_VAL_DIR) / "0.tfrecord"
+TEST_DIR = Path(DATA_OUTPUT_PCA_TEST_DIR) / "0.tfrecord"
 AUTOTUNE = tf.data.AUTOTUNE
 
 def get_features_description():
@@ -50,7 +50,8 @@ def _parse_function(record, block_level = 1):
     img_means = tf.ensure_shape(img_means, means_shape)
 
     music_corr = parse_tensor(parsed_data[f'music_block{block_level}_corr'], tf.float16)
-    music_corr = tf.ensure_shape(music_corr, corr_shape)
+    music_corr = tf.ensure_shape(music_corr, [1, corr_shape[0]])
+    music_corr = tf.reshape(music_corr, (-1,))
 
     music_means = parse_tensor(parsed_data[f'music_block{block_level}_mean'], tf.float16)
     music_means = tf.ensure_shape(music_means, means_shape)
@@ -65,7 +66,7 @@ def main(config):
     val_spe = 8
     
     feature_mapper = FeaturesMapperBlock(config.block)
-    feature_mapper.compile(tf.keras.optimizers.Adam(8e-5))
+    feature_mapper.compile(tf.keras.optimizers.Adam(1e-4))
     feature_mapper.fit(
         train_ds,
         steps_per_epoch = train_spe,
@@ -76,21 +77,21 @@ def main(config):
     )
 
 def get_callbacks(tensorboard_fq, config, sample_ds):
-    log_dir = "../logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = "../logs2/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     sample_ds = list(sample_ds.as_numpy_iterator())
 
     return [
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
-        # EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 20, verbose = 1),
+        EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 35, verbose = 1),
         ModelCheckpoint(
-            filepath = f'../checkpoints/block{config.block}/FM.{{epoch:03d}}-{{loss:.4f}}-{{val_loss:.4f}}.h5',
+            filepath = f'../checkpoints2/block{config.block}/FM.{{epoch:03d}}-{{corr_loss:.4f}}-{{val_corr_loss:.4f}}-{{means_loss:.4f}}-{{val_means_loss:.4f}}.h5',
             monitor='loss',
             mode='min',
             save_weights_only=True,
             save_best_only= True,
             verbose = 1
         ),
-        TensorBoardImage(f'../examples/block{config.block}/', sample_ds)
+        TensorBoardImage(f'../examples2/block{config.block}/', sample_ds)
     ]
 
 def preprocess_dataset(block_level = 1):
@@ -101,6 +102,7 @@ def preprocess_dataset(block_level = 1):
     train_ds = train_ds.shuffle(1024)
     train_ds = train_ds.map(lambda x: _parse_function(x, block_level), num_parallel_calls=AUTOTUNE)
     train_ds = train_ds.batch(BATCH_SIZE)
+
     train_ds = train_ds.apply(tf.data.experimental.ignore_errors())
     train_ds = train_ds.repeat()
     train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
