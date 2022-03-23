@@ -3,7 +3,7 @@ import tensorflow as tf
 from imuse import FeaturesMapperBlock
 from utils import TensorBoardImage
 from tensorflow.io import FixedLenFeature, parse_tensor, parse_single_example
-from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, LearningRateScheduler
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
 
 import argparse
 from pathlib import Path
@@ -77,21 +77,21 @@ def main(config):
     )
 
 def get_callbacks(tensorboard_fq, config, sample_ds):
-    log_dir = "../logs2/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = "../logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     sample_ds = list(sample_ds.as_numpy_iterator())
 
     return [
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
         EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 35, verbose = 1),
         ModelCheckpoint(
-            filepath = f'../checkpoints2/block{config.block}/FM.{{epoch:03d}}-{{corr_loss:.4f}}-{{val_corr_loss:.4f}}-{{means_loss:.4f}}-{{val_means_loss:.4f}}.h5',
+            filepath = f'../checkpoints/block{config.block}/FM.{{epoch:03d}}-{{corr_loss:.4f}}-{{val_corr_loss:.4f}}-{{means_loss:.4f}}-{{val_means_loss:.4f}}.h5',
             monitor='loss',
             mode='min',
             save_weights_only=True,
             save_best_only= True,
             verbose = 1
         ),
-        TensorBoardImage(f'../examples2/block{config.block}/', sample_ds)
+        TensorBoardImage(f'../examples/block{config.block}/', sample_ds)
     ]
 
 def preprocess_dataset(block_level = 1):

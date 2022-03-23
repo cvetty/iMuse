@@ -21,7 +21,7 @@ class MeansMapper(Model):
         self.means_out = Dense(2**(5+block_level))
 
 
-        self.gs_dense1 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER)
+        self.gs_dense1 = Dense(512, activation='relu', kernel_initializer=KERNEL_INITIALIZER)
         self.gs_dropout1 = Dropout(DROPOUT_RATE)
         self.gs_dense2 = Dense(2**(5 + block_level), activation='relu', kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=REGULARIZER)
         self.gs_add = Add()
