@@ -3,7 +3,7 @@ from tensorflow.keras import Model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
 
 from config import VGGISH_WEIGHTS_PATH
-from utils import get_style_correlation_transform, get_correlations, preprocess_feat
+from utils import get_correlations, preprocess_feat
 
 
 class VGGish(Model):
@@ -80,7 +80,7 @@ class VGGish(Model):
         means = []
 
         def process_feat(feat):
-            return get_style_correlation_transform(feat, normalize=normalize) if ede else get_correlations(feat, normalize=normalize)
+            return get_correlations(feat, normalize=normalize)
 
         for block in blocks:
             corr = tf.map_fn(process_feat, encoder_feat[block])

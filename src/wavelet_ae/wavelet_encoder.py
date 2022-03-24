@@ -33,7 +33,7 @@ class WaveletEncoder(Model):
         ### Block 4
         self.block4_conv2d_1 = CNNBlock(512, 3, 'WE_block4_conv2d_1')
 
-    def call(self, inputs, style_feat=None, stylization_coeff=1, trainable=False):
+    def call(self, inputs, style_corr=None, style_means=None, style_mix_coeff = 1, style_boost_coeff = 1, trainable = False):
         wavelet_skips = {
             'block1': None,
             'block2': None,
@@ -54,10 +54,10 @@ class WaveletEncoder(Model):
         wavelet_skips['block1'] = [LH_1, HL_1, HH_1, x]
         features['block1'] = LL_1
 
-        if style_feat:
+        if style_corr and style_means:
             LL_1 = tf.map_fn(
-                lambda x: wct(x[0], x[1], stylization_coeff),
-                (LL_1, style_feat['block1']),
+                lambda x: wct(x[0], x[1], x[2], style_mix_coeff, style_boost_coeff),
+                (LL_1, style_corr['block1'], style_means['block1']),
                 dtype=LL_1.dtype
             )
 
@@ -67,10 +67,10 @@ class WaveletEncoder(Model):
         wavelet_skips['block2'] = [LH_2, HL_2, HH_2, x]
         features['block2'] = LL_2
 
-        if style_feat:
+        if style_corr and style_means:
             LL_2 = tf.map_fn(
-                lambda y: wct(y[0], y[1], stylization_coeff),
-                (LL_2, style_feat['block2']),
+                lambda x: wct(x[0], x[1], x[2], style_mix_coeff, style_boost_coeff),
+                (LL_2, style_corr['block2'], style_means['block2']),
                 dtype=LL_2.dtype
             )
 
@@ -82,20 +82,20 @@ class WaveletEncoder(Model):
         wavelet_skips['block3'] = [LH_3, HL_3, HH_3, x]
         features['block3'] = LL_3
 
-        if style_feat:
+        if style_corr and style_means:
             LL_3 = tf.map_fn(
-                lambda x: wct(x[0], x[1], stylization_coeff),
-                (LL_3, style_feat['block3']),
+                lambda x: wct(x[0], x[1], x[2], style_mix_coeff, style_boost_coeff),
+                (LL_3, style_corr['block3'], style_means['block3']),
                 dtype=LL_3.dtype
             )
 
         x = self.block4_conv2d_1(LL_3)
         features['block4'] = x
 
-        if style_feat:
+        if style_corr and style_means:
             x = tf.map_fn(
-                lambda x: wct(x[0], x[1], stylization_coeff),
-                (x, style_feat['block4']),
+                lambda x: wct(x[0], x[1], x[2], style_mix_coeff, style_boost_coeff),
+                (x, style_corr['block4'], style_means['block4']),
                 dtype=x.dtype
             )
 

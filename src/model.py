@@ -1,3 +1,4 @@
+from re import S
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -33,7 +34,7 @@ class iMuse(Model):
 
         self.datagen = DatasetGenerator(pca=self.pca)
 
-    def transfer(self, music_path, image):
+    def transfer(self, music_path, image, style_mix_coeff = 1, style_boost_coeff = 1):
         style_corrs = {}
         style_means = {}
 
@@ -50,18 +51,21 @@ class iMuse(Model):
             style_corrs[f'block{block + 1}'] = style_data[0]
             style_means[f'block{block + 1}'] = style_data[1]
 
-        ### transfer
-        pass
+        ## Transfer
+        out = self.wa.transfer(image, style_corrs, style_means, style_mix_coeff, style_boost_coeff)
+
+        return out
 
         
 if __name__ == '__main__':
-    imuse = iMuse()
     test_img = tf.io.read_file('../assets/moli_content.jpg')
     test_img = tf.image.decode_image(test_img, dtype=tf.float16)
-
-    imuse.transfer(r"D:\Projects\SCHOOL\IMuse\data\music\OSTs\Set2\005.mp3", test_img)
-
-
+    test_img = tf.expand_dims(test_img, 0)
+    imuse = iMuse()
+    
+    r = imuse.transfer(r"D:\Projects\SCHOOL\IMuse\data\music\OSTs\Set2\005.mp3", test_img)[0]
+    r = (r * 255).numpy().astype(np.uint8)
+    plt.imsave('./test_std-16.png', r)
 
     # test_img_style = tf.io.read_file(r"D:\Projects\SCHOOL\IMuse\assets\moli_style.jpg")
     # test_img_style = tf.image.decode_image(test_img_style, dtype=tf.float16)

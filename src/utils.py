@@ -67,36 +67,30 @@ def center_feat(feat):
     return tf.subtract(feat, feat_mean)
 
 
-def get_svd(feat):
-    feat = center_feat(feat)
-    feat = tf.matmul(feat, feat, transpose_b=True) / (feat.shape[1] - 1)
+def get_svd(feat, with_corr_matrix = False, beta = 1):
+    if not with_corr_matrix:
+        feat = center_feat(feat)
+        feat = tf.matmul(feat, feat, transpose_b=True) / (feat.shape[1] - 1)
+    else:
+        feat *= beta
+        
     feat = feat + tf.eye(feat.shape[0])
 
     return tf.linalg.svd(feat)
 
 
-def get_style_correlation_transform(feat, return_mean=False, normalize=None):
-    feat, mean = preprocess_feat(feat)
-    s_e, _, s_v = get_svd(feat)
+def get_style_correlation_transform(feat, beta=1):
+    s_e, _, s_v = get_svd(feat, with_corr_matrix=True, beta=beta)
     # The inverse of the content singular values matrix operation (^-0.5)
     s_e = tf.pow(s_e, 0.5)
 
     EDE = tf.matmul(tf.matmul(s_v, tf.linalg.diag(s_e)), s_v, transpose_b=True)
 
-    if normalize == 'standard':
-        EDE -= tf.reduce_mean(EDE)
-        EDE /= tf.math.reduce_std(EDE)
-    elif normalize == 'min-max':
-        EDE -= tf.reduce_min(EDE)
-        EDE /= tf.reduce_max(EDE) - tf.reduce_min(EDE)
+    return EDE
 
 
-    return (EDE, mean) if return_mean else EDE
-
-
-def wct(content_feat_raw, style_feat_raw, alpha=1):
-    style_EDE, style_mean = get_style_correlation_transform(
-        style_feat_raw, return_mean=True)
+def wct(content_feat_raw, style_corr, style_mean, alpha = 1, beta = 1):
+    style_EDE = get_style_correlation_transform(style_corr, beta)
     content_feat, content_mean = preprocess_feat(content_feat_raw, center=True)
 
     c_e, _, c_v = get_svd(content_feat)
@@ -107,7 +101,7 @@ def wct(content_feat_raw, style_feat_raw, alpha=1):
     content_whitened = tf.matmul(content_EDE, content_feat)
 
     final_out = tf.matmul(style_EDE, content_whitened)
-    final_out = tf.add(final_out, tf.expand_dims(style_mean, 1))
+    final_out = tf.add(final_out, tf.reshape(style_mean, (-1, 1)))
     final_out = tf.clip_by_value(
         final_out,
         tf.math.reduce_min(content_feat),

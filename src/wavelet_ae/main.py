@@ -3,8 +3,9 @@ from tensorflow.keras import Model
 from wavelet_ae.wavelet_encoder import WaveletEncoder
 from wavelet_ae.wavelet_decoder import WaveletDecoder
 
-from utils import wct, preprocess_feat, get_style_correlation_transform, get_correlations
+from utils import wct, preprocess_feat, get_correlations
 from config import WAVELET_AE_WEIGHTS_PATH
+import sys
 
 class WaveletAE(Model):
     def __init__(self):
@@ -40,6 +41,14 @@ class WaveletAE(Model):
 
         return out
 
+    def transfer(self, image, style_corr, style_means, style_mix_coeff = 1, style_boost_coeff = 1):
+        x, content_skips, _ = self.encoder(image, style_corr, style_means, style_mix_coeff, style_boost_coeff)
+        
+        out, _ = self.decoder(x, content_skips)
+        out = tf.clip_by_value(out, 0, 1)
+        return out
+
+
     def get_features(self, inputs):
         encoder_out, skips, encoder_feat = self.encoder(inputs)
         _, decoder_feat = self.decoder(encoder_out, skips)
@@ -57,7 +66,7 @@ class WaveletAE(Model):
         means = []
 
         def process_feat(feat):
-            return get_style_correlation_transform(feat, normalize=normalize) if ede else get_correlations(feat, normalize=normalize)
+            return get_correlations(feat, normalize=normalize)
 
         for block in blocks:
             corr = tf.map_fn(process_feat, encoder_feat[block])
