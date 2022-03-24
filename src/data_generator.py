@@ -43,14 +43,9 @@ class DatasetGenerator:
             ede=False
         )
 
-        if self.pca:
-            self.style_corr_pca = []
-
         for i in range(len(self.style_corr)):
             self.style_corr[i] = tf.squeeze(self.style_corr[i], 0)
             self.style_corr[i] = tf.cast(self.style_corr[i], tf.float16)
-            if self.pca:
-                self.style_corr_pca.append(self._get_pca(self.pca[i][1], self.style_corr[i]))
 
         for i in range(len(self.style_means)):
             self.style_means[i] = tf.squeeze(self.style_means[i], 0)
@@ -76,7 +71,7 @@ class DatasetGenerator:
             self.vggish_feat_corr[i] = tf.squeeze(self.vggish_feat_corr[i], 0)
             self.vggish_feat_corr[i] = tf.cast(self.vggish_feat_corr[i], tf.float16)
             if self.pca:
-                self.vggish_feat_corr[i] = self._get_pca(self.pca[i][0], self.vggish_feat_corr[i])
+                self.vggish_feat_corr[i] = self._get_pca(self.pca[i], self.vggish_feat_corr[i])
 
         for i in range(len(self.vggish_feat_means)):
             self.vggish_feat_means[i] = tf.squeeze(self.vggish_feat_means[i], 0)
@@ -106,10 +101,6 @@ class DatasetGenerator:
             features[f'img_block{i}_mean'] = _bytes_feature(
                 serialize_tensor(self.style_means[i-1]))
 
-            if self.pca:
-                features[f'img_block{i}_corr_pca'] = _bytes_feature(
-                    serialize_tensor(self.style_corr_pca[i-1]))
-
             features[f'music_block{i}_corr'] = _bytes_feature(
                 serialize_tensor(self.vggish_feat_corr[i-1]))
             features[f'music_block{i}_mean'] = _bytes_feature(
@@ -118,4 +109,3 @@ class DatasetGenerator:
         return Example(
             features=Features(feature=features)
         ).SerializeToString()
-t = DatasetGenerator()

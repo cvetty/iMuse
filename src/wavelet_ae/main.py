@@ -22,7 +22,7 @@ class WaveletAE(Model):
 
         return output
 
-    def transfer(self, content_img, style_img, encoder_transfer=True, skips_transfer=True, decoder_transfer=True, stylization_coeffs={'encoder': 1, 'decoder': 1, 'skips': 1}):
+    def transfer_images(self, content_img, style_img, encoder_transfer=True, skips_transfer=True, decoder_transfer=True, stylization_coeffs={'encoder': 1, 'decoder': 1, 'skips': 1}):
         style_features, style_skips = self.get_features(style_img)
         x, content_skips, _ = self.encoder(content_img, style_features['encoder'] if encoder_transfer else None, stylization_coeffs['encoder'])
 

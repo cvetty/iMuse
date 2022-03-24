@@ -6,11 +6,11 @@ from tensorflow.keras.losses import MeanSquaredError
 from imuse.features_encoder import FeaturesEncoder
 from imuse.features_decoder import FeaturesDecoder
 
-from config import BATCH_SIZE
+from config import BATCH_SIZE, FEATURE_MAPPERS_WEIGHTS_DIR
 import sys
 
 class FeaturesMapperBlock(Model):
-    def __init__(self, block_level=1, kl_weight = 1 / BATCH_SIZE):
+    def __init__(self, block_level=1, kl_weight = 1 / BATCH_SIZE, load_weights=False):
         super(FeaturesMapperBlock, self).__init__()
         self._name = f'FeaturesMapper{block_level}'
         self.block_level = block_level
@@ -21,6 +21,10 @@ class FeaturesMapperBlock(Model):
         self._calculate_mar_loss = MeanSquaredError()
 
         self.means_mapper = MeansMapper(block_level)
+
+        if load_weights:
+            self.build([(1, self.encoder.raw_input_shape,), (1, self.encoder.raw_input_shape,), (1, 512)])
+            self.load_weights(str(FEATURE_MAPPERS_WEIGHTS_DIR / f'block{block_level}.h5'))
 
     def call(self, inputs, training=False):
         z_sample, self.mu, self.log_variance = self.encoder(inputs[0], inputs[1], inputs[2])

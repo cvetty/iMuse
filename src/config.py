@@ -8,7 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 WAVELET_AE_WEIGHTS_PATH = str(BASE_DIR.joinpath('weights', 'wavelet_autoencoder'))
 VGGISH_WEIGHTS_PATH = str(BASE_DIR.joinpath('weights', 'vggish'))
-PCA_WEIGHTS_DIR = BASE_DIR.joinpath('data', 'pca')
+PCA_WEIGHTS_DIR = BASE_DIR.joinpath('weights', 'pca')
+FEATURE_MAPPERS_WEIGHTS_DIR = BASE_DIR.joinpath('weights', 'feature_mappers')
 
 
 CSV_DATA_PATH = str(BASE_DIR.joinpath('data', 'music_images_data.csv'))
@@ -22,7 +23,7 @@ DATA_OUTPUT_PCA_VAL_DIR = str(BASE_DIR.joinpath('data', 'tfrecords_pca', 'val'))
 
 BATCH_SIZE = 32
 EPOCHS = 7_500
-DROPOUT_RATE = 0.25
+DROPOUT_RATE = 0.45
 
 KERNEL_INITIALIZER = HeNormal()
-REGULARIZER = l2(l=5e-3)
+REGULARIZER = l2(l=5e-2)
