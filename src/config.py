@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from sklearn.decomposition import PCA
 from tensorflow.keras.initializers import HeNormal
 from tensorflow.keras.regularizers import l2
 

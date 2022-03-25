@@ -46,6 +46,7 @@ class WaveletAE(Model):
         
         out, _ = self.decoder(x, content_skips)
         out = tf.clip_by_value(out, 0, 1)
+        
         return out
 
 

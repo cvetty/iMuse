@@ -94,10 +94,12 @@ class FeaturesMapperBlock(Model):
             'overall_loss': overall_loss
         }
 
-
     def _calculate_kl_loss(self):
         kl_loss = -0.5 * tf.math.reduce_sum(1 + self.log_variance - tf.square(
             self.mu) - tf.exp(self.log_variance), axis=1)
         kl_loss = tf.math.reduce_mean(kl_loss)
 
         return kl_loss
+
+    def sample_latent_vector(self):
+        return tf.random.normal((1, self.encoder.latent_dims))
