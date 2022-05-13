@@ -1,7 +1,7 @@
 import tensorflow as tf
 from layers import FeatureExtractorTranspose
 from tensorflow.keras import Model, Sequential
-from tensorflow.keras.layers import Dropout, Conv1DTranspose, Reshape, Dense, Concatenate, Add
+from tensorflow.keras.layers import Dropout, Conv1DTranspose, Reshape, Dense, Concatenate, Add, Input
 
 from config import DROPOUT_RATE, KERNEL_INITIALIZER, REGULARIZER
 
@@ -23,6 +23,16 @@ class FeaturesDecoder(Model):
         self.corr_fe4 = FeatureExtractorTranspose(self.corr_output_size, upsampling='conv')
         self.corr_out = Conv1DTranspose(self.corr_output_size, 1)
 
+        self.means_net = Sequential([
+            Dense(self.corr_output_size // 8, activation='relu', kernel_initializer=KERNEL_INITIALIZER),
+            Dense(self.corr_output_size // 4, activation='relu', kernel_initializer=KERNEL_INITIALIZER),
+            Dropout(DROPOUT_RATE),
+            Dense(self.corr_output_size // 4, activation='relu', kernel_initializer=KERNEL_INITIALIZER),
+            Dropout(DROPOUT_RATE),
+            Dense(self.corr_output_size // 2, activation='relu', kernel_initializer=KERNEL_INITIALIZER),
+            Dense(self.corr_output_size),
+        ])
+
     def call(self, inputs):
         ### Main Network
         corr_sample = self.sample_corr(inputs)
@@ -34,4 +44,6 @@ class FeaturesDecoder(Model):
         corr = self.corr_fe4(corr)
         corr = self.corr_out(corr)
 
-        return corr
+        means = self.means_net(inputs)
+
+        return corr, means

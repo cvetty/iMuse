@@ -51,19 +51,30 @@ class DatasetGenerator:
             self.style_means[i] = tf.squeeze(self.style_means[i], 0)
             self.style_means[i] = tf.cast(self.style_means[i], tf.float16)
 
-    def process_music(self, music_path):
+    def process_music(self, music_path, training = False):
         self.music_path = music_path
         audio_data, sr = lb.load(music_path)
-        train_len = 10 * sr
-        random_start = np.random.randint(audio_data.shape[0] - train_len)
-        audio_data = audio_data[random_start: random_start + train_len]
 
+        if training:
+            train_len = 10 * sr
+            random_start = np.random.randint(audio_data.shape[0] - train_len)
+            audio_data = audio_data[random_start: random_start + train_len]
+            
         self.spec = preprocess_sound(audio_data, sr)
         self.vggish_feat_corr, self.vggish_feat_means, self.vggish_global_stats = self.vggish.get_style_correlations(
             tf.expand_dims(self.spec, 3),
             normalize='min-max',
             ede=False
         )
+
+        ### If the audio is bigger than ten seconds(the training length), we compute the average of the features :D
+        ### TODO! -> probably compute it for all of the music regions (10s each) in order to preserve the relative emotional states
+        if self.vggish_global_stats.shape[0] > 1:
+            self.vggish_global_stats = tf.reduce_mean(self.vggish_global_stats, 0, keepdims=True)
+            for i in range(4):
+                self.vggish_feat_means[i] = tf.reduce_mean(self.vggish_feat_means[i], 0, keepdims=True)
+                self.vggish_feat_corr[i] = tf.reduce_mean(self.vggish_feat_corr[i], 0, keepdims=True)
+
         self.vggish_global_stats = tf.squeeze(self.vggish_global_stats, 0)
         self.vggish_global_stats = tf.cast(self.vggish_global_stats, tf.float16)
 

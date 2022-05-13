@@ -21,8 +21,8 @@ DATA_OUTPUT_PCA_TEST_DIR = str(BASE_DIR.joinpath('data', 'tfrecords_pca', 'test'
 DATA_OUTPUT_PCA_VAL_DIR = str(BASE_DIR.joinpath('data', 'tfrecords_pca', 'val'))
 
 BATCH_SIZE = 32
-EPOCHS = 7_500
-DROPOUT_RATE = 0.45
+EPOCHS = 1_200
+DROPOUT_RATE = 0.3
 
 KERNEL_INITIALIZER = HeNormal()
-REGULARIZER = l2(l=5e-2)
+REGULARIZER = l2(l=5e-3)

@@ -76,21 +76,21 @@ def main(config):
     )
 
 def get_callbacks(tensorboard_fq, config, sample_ds):
-    log_dir = "../logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = "../logs2/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     sample_ds = list(sample_ds.as_numpy_iterator())
 
     return [
         TensorBoard(log_dir=log_dir, update_freq = tensorboard_fq),
-        EarlyStopping(monitor = 'overall_loss', min_delta = 1e-3, patience = 125, verbose = 1),
+        EarlyStopping(monitor = 'loss', min_delta = 1e-3, patience = 25, verbose = 1),
         ModelCheckpoint(
-            filepath = f'../checkpoints/block{config.block}/FM.{{epoch:03d}}-{{corr_loss:.4f}}-{{val_corr_loss:.4f}}-{{means_loss:.4f}}-{{val_means_loss:.4f}}.h5',
-            monitor='overall_loss',
+            filepath = f'../checkpoints2/block{config.block}/FM.{{epoch:03d}}-{{corr_mse:.4f}}-{{val_corr_mse:.4f}}-{{means_mse:.4f}}-{{val_means_mse:.4f}}.h5',
+            monitor='loss',
             mode='min',
             save_weights_only=True,
             save_best_only= True,
             verbose = 1
         ),
-        TensorBoardImage(f'../examples/block{config.block}/', sample_ds)
+        TensorBoardImage(f'../examples2/block{config.block}/', sample_ds)
     ]
 
 def preprocess_dataset(block_level = 1):
